@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -193,6 +194,20 @@ func WithRedisBackedCache() Option {
 	}
 }
 
+func WithLambdaRole(arn string) Option {
+	return func(c *config) {
+		viper.Set("lambdaManageRole", false)
+		viper.Set("lambdaRoleARN", arn)
+	}
+}
+
+func WithLambdaS3Backend(bucket, key string) Option {
+	return func(c *config) {
+		viper.Set("lambdaS3Bucket", bucket)
+		viper.Set("lambdaS3Key", key)
+	}
+}
+
 func (d *Driver) GetFinalOutputs() []string {
 	return d.lastOutputs
 }
@@ -361,6 +376,17 @@ func (d *Driver) run() {
 		return
 	}
 
+	if strings.Contains(d.config.Inputs[0], "://") {
+		//We are using remote inputs
+		if backendFlag != nil && *backendFlag != "local" {
+			//we are runing remotely?
+			if !strings.Contains(d.config.WorkingLocation, "://") {
+				log.Errorf("Running remote executer without remote output location. set --out to a reachable output location for the executor.")
+				return
+			}
+		}
+	}
+
 	if rlh := viper.GetString("remoteLoggingHost"); rlh != "" {
 		log.Debugf("using remote logging host: %s for functions", rlh)
 	}
@@ -372,6 +398,7 @@ func (d *Driver) run() {
 	} else {
 		inputs = d.config.Inputs
 	}
+
 	for idx, job := range d.jobs {
 		if viper.GetBool("verbose") || *verbose {
 			log.Debugf("collecting job metrics")

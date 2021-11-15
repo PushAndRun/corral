@@ -83,7 +83,7 @@ func handleRequest(ctx context.Context, task task) (string, error) {
 		return os.Getenv("AWS_LAMBDA_LOG_STREAM_NAME")
 	})(task)
 	if err != nil {
-		return "", err
+		return "{}", err
 	}
 
 	payload, _ := json.Marshal(result)

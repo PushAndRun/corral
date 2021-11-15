@@ -27,6 +27,7 @@ func setupDefaults() {
 		"lambdaMemory":       1500,
 		"lambdaTimeout":      180,
 		"lambdaManageRole":   true,
+		"lambdaRoleARN":      "", // added for compleatness is used in conjunction with lambdaManageRole
 		"lambdaS3Key":        "",
 		"lambdaS3Bucket":     "",
 		"cleanup":            true,

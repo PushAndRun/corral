@@ -9,6 +9,7 @@ import (
 	"github.com/ISE-SMILE/corral/internal/pkg/corbuild"
 	"github.com/ISE-SMILE/corral/internal/pkg/corcache"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"os"
 	"strings"
 
 	lambdaMessages "github.com/aws/aws-lambda-go/lambda/messages"
@@ -82,8 +83,11 @@ func (d *FunctionConfig) Prepare() (*lambda.FunctionCode, error) {
 	}
 
 	if d.S3Key != "" && d.S3Bucket != "" {
+		//Fixes missing region, arguably bad design to use a env var this way but...
+		_ = os.Setenv("AWS_SDK_LOAD_CONFIG", "true")
 		log.Infof("Uploading deployment package to S3 %s/%s", d.S3Bucket, d.S3Key)
 		sess, err := session.NewSession()
+
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +107,7 @@ func (d *FunctionConfig) Prepare() (*lambda.FunctionCode, error) {
 
 		return &lambda.FunctionCode{
 			S3Bucket: &d.S3Bucket,
-			S3Key:    &d.S3Bucket,
+			S3Key:    &d.S3Key,
 		}, nil
 	} else {
 		log.Infof("Uploading deployment as zip")
