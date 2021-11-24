@@ -32,18 +32,20 @@ func handle(driver *Driver, hostID func() string, requestID func() string) func(
 			result.EEnd = time.Now().UnixNano()
 			return result, err
 		}
-		log.Infof("%d - %+v", task.FileSystemType, task)
+		log.Debugf("%d - %+v", task.FileSystemType, task)
 		currentJob := driver.jobs[task.JobNumber]
 
-		cache, err := corcache.NewCacheSystem(task.CacheSystemType)
-		if err != nil {
-			result.EEnd = time.Now().UnixNano()
-			return result, err
+		if task.CacheSystemType  != corcache.NoCache {
+			cache, err := corcache.NewCacheSystem(task.CacheSystemType)
+			if err != nil {
+				result.EEnd = time.Now().UnixNano()
+				return result, err
+			}
+			currentJob.cacheSystem = cache
 		}
 
 		driver.currentJob = task.JobNumber
 		currentJob.fileSystem = fs
-		currentJob.cacheSystem = cache
 		currentJob.intermediateBins = task.IntermediateBins
 		currentJob.outputPath = task.WorkingLocation
 		currentJob.config.Cleanup = task.Cleanup

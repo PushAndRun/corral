@@ -2,6 +2,7 @@ package corral
 
 import (
 	"fmt"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"time"
@@ -11,10 +12,11 @@ type executor interface {
 	RunMapper(job *Job, jobNumber int, binID uint, inputSplits []inputSplit) error
 	RunReducer(job *Job, jobNumber int, binID uint) error
 
+	//HintSplits is called before running a Map/Reducer Step to give the backend a hint on needed scale
 	HintSplits(splits uint) error
 }
 
-type smileExecuter interface {
+type smileExecutor interface {
 	executor
 	BatchRunMapper(job *Job, jobNumber int, inputSplits [][]inputSplit) error
 	BatchRunReducer(job *Job, jobNumber int, bins []uint) error
@@ -74,5 +76,6 @@ func (l *localExecutor) RunReducer(job *Job, jobNumber int, binID uint) error {
 }
 
 func (l *localExecutor) HintSplits(splits uint) error {
+	runtime.GOMAXPROCS(int(splits << 2))
 	return nil
 }
