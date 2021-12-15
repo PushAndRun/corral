@@ -3,7 +3,9 @@ package corral
 import (
 	"context"
 	"fmt"
-	"github.com/ISE-SMILE/corral/internal/pkg/corcache"
+	"github.com/ISE-SMILE/corral/api"
+	"github.com/ISE-SMILE/corral/internal/corcache"
+	"github.com/ISE-SMILE/corral/internal/corfs"
 	"io"
 	"math/rand"
 	"os"
@@ -23,8 +25,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	pb "gopkg.in/cheggaaa/pb.v1"
 
-	"github.com/ISE-SMILE/corral/internal/pkg/corfs"
-
 	flag "github.com/spf13/pflag"
 )
 
@@ -40,7 +40,7 @@ type Driver struct {
 	jobs      []*Job
 	config    *config
 	executor  executor
-	cache     corcache.CacheSystem
+	cache     api.CacheSystem
 	runtimeID string
 	Start     time.Time
 
@@ -282,7 +282,7 @@ func (d *Driver) runMapPhase(job *Job, jobNumber int, inputs []string) {
 		//XXX: binID casted to uint
 		sem.Acquire(context.Background(), 1)
 		wg.Add(1)
-		go func(bID uint, b []inputSplit) {
+		go func(bID uint, b []InputSplit) {
 			defer wg.Done()
 			defer sem.Release(1)
 			defer bar.Increment()
@@ -439,7 +439,7 @@ func (d *Driver) run() {
 		if viper.GetBool("durable") && !viper.GetBool("cleanup") {
 			if d.cache != nil {
 				//we dont need to wait for this to finish, this might also take a while ...
-				go func(cache corcache.CacheSystem, fs corfs.FileSystem) {
+				go func(cache api.CacheSystem, fs api.FileSystem) {
 					err := cache.Flush(fs)
 
 					if err != nil {

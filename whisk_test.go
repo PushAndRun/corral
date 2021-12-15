@@ -2,9 +2,9 @@ package corral
 
 import (
 	"encoding/json"
-	"github.com/ISE-SMILE/corral/internal/pkg/corbuild"
-	"github.com/ISE-SMILE/corral/internal/pkg/corfs"
-	"github.com/ISE-SMILE/corral/internal/pkg/corwhisk"
+	"github.com/ISE-SMILE/corral/internal/compute/build"
+	"github.com/ISE-SMILE/corral/internal/compute/corwhisk"
+	"github.com/ISE-SMILE/corral/internal/corfs"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +34,7 @@ func TestHandleWhiskRequest(t *testing.T) {
 		Phase:            MapPhase,
 		BinID:            0,
 		IntermediateBins: 10,
-		Splits:           []inputSplit{},
+		Splits:           []InputSplit{},
 		FileSystemType:   corfs.Local,
 		WorkingLocation:  ".",
 	}
@@ -90,7 +90,7 @@ func TestRunWhiskMapper(t *testing.T) {
 	job := &Job{
 		config: &config{WorkingLocation: "."},
 	}
-	err := executor.RunMapper(job, 0, 10, []inputSplit{})
+	err := executor.RunMapper(job, 0, 10, []InputSplit{})
 	assert.Nil(t, err)
 
 	var taskPayload task
@@ -192,7 +192,7 @@ func TestWiskLocalRuntime(t *testing.T) {
 		JobNumber:        0,
 		Phase:            MapPhase,
 		BinID:            0,
-		Splits:           []inputSplit{},
+		Splits:           []InputSplit{},
 		IntermediateBins: job.intermediateBins,
 		FileSystemType:   corfs.MINIO,
 		WorkingLocation:  job.outputPath,
@@ -203,7 +203,7 @@ func TestWiskLocalRuntime(t *testing.T) {
 		Env:   make(map[string]*string),
 	}
 
-	corbuild.InjectConfiguration(invocation.Env)
+	build.InjectConfiguration(invocation.Env)
 	strBool := "true"
 	invocation.Env["OW_DEBUG"] = &strBool
 

@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/ISE-SMILE/corral/api"
 	"testing"
 
-	"github.com/ISE-SMILE/corral/internal/pkg/corfs"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,16 +21,16 @@ func TestPackInputSplits(t *testing.T) {
 	}
 
 	for _, test := range packingTests {
-		splits := make([]inputSplit, len(test.splitSizes))
+		splits := make([]InputSplit, len(test.splitSizes))
 		for i, size := range test.splitSizes {
-			splits[i] = inputSplit{
+			splits[i] = InputSplit{
 				StartOffset: 0,
 				EndOffset:   int64(size) - 1,
 			}
 		}
 
 		splitsSeen := 0
-		bins := packInputSplits(splits, test.maxBinSize)
+		bins := api.packInputSplits(splits, test.maxBinSize)
 		for _, bin := range bins {
 			binSize := int64(0)
 			splitsSeen += len(bin)
@@ -58,11 +58,11 @@ func TestCalculateInputSplits(t *testing.T) {
 	}
 
 	for _, test := range calculateSplitTests {
-		fInfo := corfs.FileInfo{
+		fInfo := api.FileInfo{
 			Size: test.fileSize,
 		}
 
-		splits := splitInputFile(fInfo, test.maxSplitSize)
+		splits := api.splitInputFile(fInfo, test.maxSplitSize)
 
 		assert.Equal(t, len(test.expectedSplitStarts), len(splits), fmt.Sprintln(splits))
 		for i, split := range splits {
@@ -84,7 +84,7 @@ func TestSplitSize(t *testing.T) {
 	}
 
 	for _, test := range splitSizeTests {
-		split := inputSplit{
+		split := InputSplit{
 			StartOffset: test.startOffset,
 			EndOffset:   test.endOffset,
 		}
@@ -94,7 +94,7 @@ func TestSplitSize(t *testing.T) {
 
 func TestCountingSplitFunc(t *testing.T) {
 	var bytesRead int64
-	splitFunc := countingSplitFunc(bufio.ScanLines, &bytesRead)
+	splitFunc := api.countingSplitFunc(bufio.ScanLines, &bytesRead)
 
 	buf := new(bytes.Buffer)
 	buf.Write([]byte("foo\n123456\na"))

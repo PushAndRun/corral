@@ -31,39 +31,38 @@ func TestSplitInputRecord(t *testing.T) {
 	}
 }
 
-func TestJob_CollectMetrics	(t *testing.T) {
-	logName := fmt.Sprintf("activations_%s.csv",time.Now().Format("2006_01_02"))
+func TestJob_CollectMetrics(t *testing.T) {
+	logName := fmt.Sprintf("activations_%s.csv", time.Now().Format("2006_01_02"))
 	//backup exsisting file
-	if _, err := os.Stat(logName); err == nil{
+	if _, err := os.Stat(logName); err == nil {
 		err := os.Rename(logName, logName+".bak")
-		if err != nil{
-			t.Fatalf("could not move %+v",err)
+		if err != nil {
+			t.Fatalf("could not move %+v", err)
 		}
 	} else {
 		if !os.IsNotExist(err) {
-			t.Fatalf("could not access logfile %+v",err)
+			t.Fatalf("could not access logfile %+v", err)
 		}
 	}
 
-	viper.Set("logname","activations")
+	viper.Set("logname", "activations")
 	job := &Job{}
 	go job.CollectMetrics()
 
 	for i := 0; i < 10; i++ {
-		job.collectActivation(taskResult{
+		job.Collect(taskResult{
 			BytesRead:    i,
 			BytesWritten: i,
 			Log:          "",
 			HId:          "",
-			RId:		  "",
+			RId:          "",
 			CId:          "",
 			JId:          "",
 			CStart:       0,
 			EStart:       0,
 			EEnd:         0,
-
 		})
-		<-time.After(time.Second*3)
+		<-time.After(time.Second * 3)
 	}
 
 	job.done()

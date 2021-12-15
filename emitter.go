@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ISE-SMILE/corral/api"
 	"hash/fnv"
 	"io"
 	"strings"
 	"sync"
 
-	"github.com/ISE-SMILE/corral/internal/pkg/corfs"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -60,7 +60,7 @@ func (e *reducerEmitter) bytesWritten() int64 {
 type mapperEmitter struct {
 	numBins       uint                    // number of intermediate shuffle bins
 	writers       map[uint]io.WriteCloser // maps a parition number to an open writer
-	fs            corfs.FileSystem        // filesystem to use when opening writers
+	fs            api.FileSystem          // filesystem to use when opening writers
 	mapperID      uint                    // numeric identifier of the mapper using this emitter
 	outDir        string                  // folder to save map output to
 	partitionFunc PartitionFunc           // PartitionFunc to use when partitioning map output keys into intermediate bins
@@ -68,7 +68,7 @@ type mapperEmitter struct {
 }
 
 // Initializes a new mapperEmitter
-func newMapperEmitter(numBins uint, mapperID uint, outDir string, fs corfs.FileSystem) mapperEmitter {
+func newMapperEmitter(numBins uint, mapperID uint, outDir string, fs api.FileSystem) mapperEmitter {
 	return mapperEmitter{
 		numBins:       numBins,
 		writers:       make(map[uint]io.WriteCloser, numBins),

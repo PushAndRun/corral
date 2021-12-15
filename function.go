@@ -2,11 +2,11 @@ package corral
 
 import (
 	"fmt"
-	"github.com/ISE-SMILE/corral/internal/pkg/corcache"
+	"github.com/ISE-SMILE/corral/internal/corcache"
+	"github.com/ISE-SMILE/corral/internal/corfs"
 	"runtime/debug"
 	"time"
 
-	"github.com/ISE-SMILE/corral/internal/pkg/corfs"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,7 +35,7 @@ func handle(driver *Driver, hostID func() string, requestID func() string) func(
 		log.Debugf("%d - %+v", task.FileSystemType, task)
 		currentJob := driver.jobs[task.JobNumber]
 
-		if task.CacheSystemType  != corcache.NoCache {
+		if task.CacheSystemType != corcache.NoCache {
 			cache, err := corcache.NewCacheSystem(task.CacheSystemType)
 			if err != nil {
 				result.EEnd = time.Now().UnixNano()

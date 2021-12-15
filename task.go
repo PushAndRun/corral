@@ -1,8 +1,8 @@
 package corral
 
 import (
-	"github.com/ISE-SMILE/corral/internal/pkg/corcache"
-	"github.com/ISE-SMILE/corral/internal/pkg/corfs"
+	"github.com/ISE-SMILE/corral/internal/corcache"
+	"github.com/ISE-SMILE/corral/internal/corfs"
 )
 
 // Phase is a descriptor of the phase (i.e. Map or Reduce) of a Job
@@ -24,7 +24,7 @@ type task struct {
 	Phase            Phase
 	BinID            uint
 	IntermediateBins uint
-	Splits           []inputSplit
+	Splits           []InputSplit
 	FileSystemType   corfs.FileSystemType
 	CacheSystemType  corcache.CacheSystemType
 	WorkingLocation  string

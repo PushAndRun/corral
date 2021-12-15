@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ISE-SMILE/corral/internal/pkg/corcache"
+	"github.com/ISE-SMILE/corral/internal/compute/coriam"
+	"github.com/ISE-SMILE/corral/internal/compute/corlambda"
+	"github.com/ISE-SMILE/corral/internal/corcache"
+	"github.com/ISE-SMILE/corral/internal/corfs"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"os"
 	"strconv"
@@ -16,10 +19,6 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-
-	"github.com/ISE-SMILE/corral/internal/pkg/corfs"
-	"github.com/ISE-SMILE/corral/internal/pkg/coriam"
-	"github.com/ISE-SMILE/corral/internal/pkg/corlambda"
 )
 
 var (
@@ -128,7 +127,7 @@ func (l *lambdaExecutor) HintSplits(splits uint) error {
 	return nil
 }
 
-func (l *lambdaExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSplits []inputSplit) error {
+func (l *lambdaExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSplits []InputSplit) error {
 	mapTask := task{
 		JobNumber:        jobNumber,
 		Phase:            MapPhase,
@@ -147,7 +146,7 @@ func (l *lambdaExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSpl
 	resultPayload, err := l.Invoke(l.functionName, payload)
 	taskResult := loadTaskResult(resultPayload)
 
-	job.collectActivation(taskResult)
+	job.Collect(taskResult)
 	atomic.AddInt64(&job.bytesRead, int64(taskResult.BytesRead))
 	atomic.AddInt64(&job.bytesWritten, int64(taskResult.BytesWritten))
 
@@ -172,7 +171,7 @@ func (l *lambdaExecutor) RunReducer(job *Job, jobNumber int, binID uint) error {
 	resultPayload, err := l.Invoke(l.functionName, payload)
 	taskResult := loadTaskResult(resultPayload)
 
-	job.collectActivation(taskResult)
+	job.Collect(taskResult)
 	atomic.AddInt64(&job.bytesRead, int64(taskResult.BytesRead))
 	atomic.AddInt64(&job.bytesWritten, int64(taskResult.BytesWritten))
 

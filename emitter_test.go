@@ -3,13 +3,12 @@ package corral
 import (
 	"bytes"
 	"fmt"
+	"github.com/ISE-SMILE/corral/api"
 	"io"
 	"io/ioutil"
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/ISE-SMILE/corral/internal/pkg/corfs"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -78,8 +77,8 @@ func (m *mockFs) Split(path string) []string {
 	return strings.Split(path, "/")
 }
 
-func (m *mockFs) ListFiles(string) ([]corfs.FileInfo, error) {
-	return []corfs.FileInfo{}, nil
+func (m *mockFs) ListFiles(string) ([]api.FileInfo, error) {
+	return []api.FileInfo{}, nil
 }
 
 func (m *mockFs) OpenReader(filePath string, startAt int64) (io.ReadCloser, error) {
@@ -94,8 +93,8 @@ func (m *mockFs) OpenWriter(filePath string) (io.WriteCloser, error) {
 	return m.writers[filePath], nil
 }
 
-func (m *mockFs) Stat(filePath string) (corfs.FileInfo, error) {
-	return corfs.FileInfo{
+func (m *mockFs) Stat(filePath string) (api.FileInfo, error) {
+	return api.FileInfo{
 		Name: filePath,
 		Size: 0,
 	}, nil
@@ -109,7 +108,7 @@ func (m *mockFs) Delete(string) error { return nil }
 
 func TestMapperEmitter(t *testing.T) {
 	mFs := &mockFs{writers: make(map[string]*testWriteCloser)}
-	var fs corfs.FileSystem = mFs
+	var fs api.FileSystem = mFs
 	emitter := newMapperEmitter(3, 0, "out", fs)
 
 	err := emitter.Emit("key1", "val1")
@@ -132,7 +131,7 @@ func TestMapperEmitter(t *testing.T) {
 
 func TestMapperEmitterCustomPartition(t *testing.T) {
 	mFs := &mockFs{writers: make(map[string]*testWriteCloser)}
-	var fs corfs.FileSystem = mFs
+	var fs api.FileSystem = mFs
 	emitter := newMapperEmitter(3, 0, "out", fs)
 	emitter.partitionFunc = func(key string, numBuckets uint) uint {
 		if strings.HasPrefix(key, "a") {

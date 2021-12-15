@@ -2,6 +2,8 @@ package corral
 
 import (
 	"encoding/json"
+	"github.com/ISE-SMILE/corral/internal/compute/corlambda"
+	"github.com/ISE-SMILE/corral/internal/corcache"
 	"os"
 	"testing"
 	"time"
@@ -10,9 +12,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/aws/aws-sdk-go/service/lambda/lambdaiface"
-
-	"github.com/ISE-SMILE/corral/internal/pkg/corfs"
-	"github.com/ISE-SMILE/corral/internal/pkg/corlambda"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -35,8 +34,8 @@ func TestHandleRequest(t *testing.T) {
 		Phase:            MapPhase,
 		BinID:            0,
 		IntermediateBins: 10,
-		Splits:           []inputSplit{},
-		FileSystemType:   corfs.Local,
+		Splits:           []InputSplit{},
+		FileSystemType:   corcache.Local,
 		WorkingLocation:  ".",
 	}
 
@@ -116,7 +115,7 @@ func TestRunLambdaMapper(t *testing.T) {
 	job := &Job{
 		config: &config{WorkingLocation: "."},
 	}
-	err := executor.RunMapper(job, 0, 10, []inputSplit{})
+	err := executor.RunMapper(job, 0, 10, []InputSplit{})
 	assert.Nil(t, err)
 
 	var taskPayload task

@@ -3,23 +3,16 @@ package corral
 import (
 	"bufio"
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"github.com/ISE-SMILE/corral/internal/pkg/corcache"
-	"github.com/spf13/viper"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
-
-	"github.com/ISE-SMILE/corral/internal/pkg/corfs"
+	"github.com/ISE-SMILE/corral/api"
+	"github.com/ISE-SMILE/corral/internal/cormetics"
 	humanize "github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
+	"strings"
+	"sync"
+	"sync/atomic"
 )
 
 // Job is the logical container for a MapReduce job
@@ -32,8 +25,8 @@ type Job struct {
 	StopFunc  StopFunc
 	HintFunc  HintFunc
 
-	fileSystem  corfs.FileSystem
-	cacheSystem corcache.CacheSystem
+	fileSystem  api.FileSystem
+	cacheSystem api.CacheSystem
 
 	config           *config
 	intermediateBins uint
@@ -41,9 +34,7 @@ type Job struct {
 
 	bytesRead    int64
 	bytesWritten int64
-
-	activationLog chan taskResult
-	wg            sync.WaitGroup
+	metrics      *cormetics.Metrics
 }
 
 //type SortFunc func() int
@@ -52,16 +43,10 @@ type SortJob struct {
 	Job
 }
 
-func (j *Job) collectActivation(result taskResult) {
-	if j.activationLog != nil {
-		j.activationLog <- result
-	}
-}
-
 // Logic for running a single map task
-func (j *Job) runMapper(mapperID uint, splits []inputSplit) error {
+func (j *Job) runMapper(mapperID uint, splits []InputSplit) error {
 	//check if we can use a cacheFS instead
-	var fs corfs.FileSystem = j.fileSystem
+	var fs api.FileSystem = j.fileSystem
 	if j.cacheSystem != nil {
 		fs = j.cacheSystem
 	}
@@ -96,8 +81,8 @@ func splitInputRecord(record string) *keyValue {
 	}
 }
 
-// runMapperSplit runs the mapper on a single inputSplit
-func (j *Job) runMapperSplit(split inputSplit, emitter Emitter) error {
+// runMapperSplit runs the mapper on a single InputSplit
+func (j *Job) runMapperSplit(split InputSplit, emitter Emitter) error {
 	offset := split.StartOffset
 	if split.StartOffset != 0 {
 		offset--
@@ -126,7 +111,7 @@ func (j *Job) runMapperSplit(split inputSplit, emitter Emitter) error {
 		}
 		j.Map.Map(kv.Key, kv.Value, emitter)
 
-		// Stop reading when end of inputSplit is reached
+		// Stop reading when end of InputSplit is reached
 		pos := bytesRead
 		if split.Size() > 0 && pos > split.Size() {
 			break
@@ -141,7 +126,7 @@ func (j *Job) runMapperSplit(split inputSplit, emitter Emitter) error {
 // Logic for running a single reduce task
 func (j *Job) runReducer(binID uint) error {
 	//check if we can use a cacheFS instead
-	var fs corfs.FileSystem = j.fileSystem
+	var fs api.FileSystem = j.fileSystem
 	if j.cacheSystem != nil {
 		fs = j.cacheSystem
 	}
@@ -233,7 +218,7 @@ func (j *Job) runReducer(binID uint) error {
 
 // inputSplits calculates all input files' inputSplits.
 // inputSplits also determines and saves the number of intermediate bins that will be used during the shuffle.
-func (j *Job) inputSplits(inputs []string, maxSplitSize int64) []inputSplit {
+func (j *Job) inputSplits(inputs []string, maxSplitSize int64) []InputSplit {
 	files := make([]string, 0)
 	for _, inputPath := range inputs {
 		fileInfos, err := j.fileSystem.ListFiles(inputPath)
@@ -247,7 +232,7 @@ func (j *Job) inputSplits(inputs []string, maxSplitSize int64) []inputSplit {
 		}
 	}
 
-	splits := make([]inputSplit, 0)
+	splits := make([]InputSplit, 0)
 	var totalSize int64
 	for _, inputFileName := range files {
 		fInfo, err := j.fileSystem.Stat(inputFileName)
@@ -272,87 +257,45 @@ func (j *Job) inputSplits(inputs []string, maxSplitSize int64) []inputSplit {
 }
 
 func (j *Job) done() {
-	if j.activationLog != nil {
-		close(j.activationLog)
-	}
-	j.wg.Wait()
-}
-
-func (j *Job) writeActivationLog() {
-
-	logName := fmt.Sprintf("%s_%s.csv",
-		viper.GetString("logName"),
-		time.Now().Format("2006_01_02"))
-
-	if viper.IsSet("logDir") {
-		logName = filepath.Join(viper.GetString("logDir"), logName)
-	} else if dir := os.Getenv("CORRAL_LOGDIR"); dir != "" {
-		logName = filepath.Join(dir, logName)
-	}
-
-	writeHeder := true
-
-	//we asume the log already exsists...
-	_, err := os.Stat(logName)
-	if err == nil {
-		writeHeder = false
-	}
-
-	logFile, err := os.OpenFile(logName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		log.Errorf("failed to open activation log @ %s - %f", logName, err)
-		return
-	}
-	writer := bufio.NewWriter(logFile)
-	logWriter := csv.NewWriter(writer)
-
-	if writeHeder {
-		//write header
-		err = logWriter.Write([]string{
-			"JId", "CId", "HId", "RId", "CStart", "EStart", "EEnd", "Read", "Written",
-			"CMEM", "CMBS", "CRBS", "CSP", "CMC", "CTO",
-		})
-		if err != nil {
-			log.Errorf("failed to open activation log @ %s - %f", logName, err)
-			return
-		}
-	}
-	j.wg.Add(1)
-	for task := range j.activationLog {
-
-		err = logWriter.Write([]string{
-			task.JId,
-			task.CId,
-			task.HId,
-			task.RId,
-			strconv.FormatInt(task.CStart, 10),
-			strconv.FormatInt(task.EStart, 10),
-			strconv.FormatInt(task.EEnd, 10),
-			strconv.Itoa(task.BytesRead),
-			strconv.Itoa(task.BytesWritten),
-			strconv.FormatInt(viper.GetInt64("lambdaMemory"), 10),
-			strconv.FormatInt(viper.GetInt64("mapBinSize"), 10),
-			strconv.FormatInt(viper.GetInt64("reduceBinSize"), 10),
-			strconv.FormatInt(viper.GetInt64("splitSize"), 10),
-			strconv.FormatInt(viper.GetInt64("maxConcurrency"), 10),
-			strconv.FormatInt(viper.GetInt64("lambdaTimeout"), 10),
-		})
-		if err != nil {
-			log.Debugf("failed to write %+v - %f", task, err)
-		}
-		logWriter.Flush()
-	}
-	err = logFile.Close()
-	log.Info("written metrics")
-	j.wg.Done()
+	j.metrics.Reset()
 }
 
 //needs to run in a process
 func (j *Job) CollectMetrics() {
-	j.activationLog = make(chan taskResult)
-	j.wg = sync.WaitGroup{}
-	j.writeActivationLog()
+	metrics, err := cormetics.CollectMetrics(map[string]string{
+		"RId":          "request identifier",
+		"CId":          "container identifier",
+		"HId":          "vm id",
+		"JId":          "job id",
+		"cStart":       "container start time",
+		"eStart":       "execution start",
+		"eEnd":         "execution end",
+		"BytesRead":    "request received",
+		"BytesWritten": "delivery latency",
+	})
 
+	if err != nil {
+		log.Errorf("could not collect metrics. cause: %+v", err)
+	} else {
+		j.metrics = metrics
+		j.metrics.Start()
+	}
+}
+
+func (j *Job) Collect(result taskResult) {
+	if j.metrics != nil {
+		j.metrics.Collect(map[string]interface{}{
+			"RId":          result.RId,
+			"CId":          result.CId,
+			"HId":          result.HId,
+			"JId":          result.JId,
+			"cStart":       result.CStart,
+			"eStart":       result.EStart,
+			"eEnd":         result.EEnd,
+			"BytesRead":    result.BytesRead,
+			"BytesWritten": result.BytesWritten,
+		})
+	}
 }
 
 // NewJob creates a new job from a Mapper and Reducer.
