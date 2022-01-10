@@ -143,7 +143,7 @@ func (l *LocalCache) Delete(path string) error {
 		//
 		//
 		//	for _, f := range files {
-		//		err = l.Delete(f.Name)
+		//		err = l.Delete(f.FullName)
 		//		if err != nil {
 		//			return err
 		//		}

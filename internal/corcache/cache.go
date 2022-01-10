@@ -34,7 +34,7 @@ func NewCacheSystem(fsType CacheSystemType) (api.CacheSystem, error) {
 		cs = NewLocalInMemoryProvider(viper.GetUint64("cacheSize"))
 	case Redis:
 		var err error
-		cs, err = redis_cache.NewRedisBackedCache(redis_cache.DeploymentType(viper.GetInt("redisDeploymentType")))
+		cs, err = redis_cache.NewRedisBackedCache(viper.GetString("redisDeploymentType"))
 		if err != nil {
 			log.Debugf("failed to init redis cache, %+v", err)
 			return nil, err

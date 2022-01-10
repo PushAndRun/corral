@@ -9,87 +9,39 @@ import (
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/go-redis/redis/v8"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 )
 
-type DeploymentType int
-
-const (
-	LocalDeployment DeploymentType = iota
-	KubernetesDeployment
-	AWS
-)
-
-func NewDeploymentStrategy(deploymentType DeploymentType) (DeploymentStrategy, error) {
-	switch deploymentType {
-	case LocalDeployment:
-		log.Debug("using local-docker redis deployment")
-		return &LocalRedisDeploymentStrategy{}, nil
-	case KubernetesDeployment:
-		log.Debug("using kubernatis based deployment")
-		krds := &KubernetesRedisDeploymentStrategy{
-			Namespace:    viper.GetString("kubernetesNamespace"),
-			StorageClass: viper.GetString("kubernetesStorageClass"),
-		}
-
-		if viper.IsSet("redisPort") {
-			foo := viper.GetInt("redisPort")
-			krds.NodePort = &foo
-		}
-
-		return krds, nil
-	case AWS:
-		return nil, fmt.Errorf("not yet implemented")
-	default:
-		return nil, fmt.Errorf("unexpected deploymentType: %+v", deploymentType)
-	}
+type RedisBackedCache struct {
+	api.Plugin
+	DeploymentClient RedisDeploymentStrategyClient
+	Client           redis.UniversalClient
+	Config           *RedisClientConfig
 }
 
-type ClientConfig struct {
-	Addrs          []string
-	DB             int
-	User           string
-	password       string
-	RouteByLatency bool
-	RouteRandomly  bool
-}
-
-func (rc *ClientConfig) asOptions() *redis.UniversalOptions {
+func (rc *RedisClientConfig) asOptions() *redis.UniversalOptions {
 	return &redis.UniversalOptions{
 		Addrs:          rc.Addrs,
-		DB:             rc.DB,
+		DB:             int(rc.DB),
 		Username:       rc.User,
-		Password:       rc.password,
+		Password:       rc.Password,
 		RouteByLatency: rc.RouteByLatency,
 		RouteRandomly:  rc.RouteRandomly,
 	}
 }
 
-type DeploymentStrategy interface {
-	Deploy() (*ClientConfig, error)
-	Undeploy() error
-}
-
-type RedisBackedCache struct {
-	DeploymentStragey DeploymentStrategy
-	Client            redis.UniversalClient
-	Config            *ClientConfig
-}
-
-func NewRedisBackedCache(deploymentType DeploymentType) (*RedisBackedCache, error) {
-	ds, err := NewDeploymentStrategy(deploymentType)
-	if err != nil {
-		log.Debug("failed to create deployment strategy for redis backend")
-		return nil, err
+func NewRedisBackedCache(pluginName string) (*RedisBackedCache, error) {
+	if pluginName == "" {
+		pluginName = "github.com/ISE-SMILE/corral_redis_deploy"
 	}
-	log.Infof("using %+v redis deployment strategy", deploymentType)
-
 	return &RedisBackedCache{
-		DeploymentStragey: ds,
+		Plugin: api.Plugin{
+			FullName:       pluginName,
+			ExecutableName: "corral_redis_deploy",
+		},
 	}, nil
 
 }
@@ -102,7 +54,7 @@ func (r *RedisBackedCache) Init() error {
 
 	//we have no config, lets try to make one from the enviroment or fail
 	if r.Config == nil {
-		conf := ClientConfig{}
+		conf := RedisClientConfig{}
 
 		fail := func(key string) error {
 			return fmt.Errorf("missing client conif and %s not set in enviroment", key)
@@ -125,7 +77,7 @@ func (r *RedisBackedCache) Init() error {
 			if err != nil {
 				return err
 			}
-			conf.DB = int(dbp)
+			conf.DB = int32(dbp)
 		} else {
 			return fail("REDIS_DB")
 		}
@@ -140,7 +92,7 @@ func (r *RedisBackedCache) Init() error {
 		//TODO: XXXX this is not a good practice, we could compile this in code and fail in local settings, but for now it is what it is...
 		secret := os.Getenv("REDIS_SECRET")
 		if user != "" {
-			conf.password = secret
+			conf.Password = secret
 		} else {
 			return fail("REDIS_SECRET")
 		}
@@ -281,23 +233,6 @@ func (r *RedisBackedCache) Split(path string) []string {
 	return strings.Split(path, "/")
 }
 
-func (r *RedisBackedCache) Deploy() error {
-	conf, err := r.DeploymentStragey.Deploy()
-	if err != nil {
-		return err
-	}
-
-	r.Config = conf
-
-	return nil
-
-}
-
-func (r *RedisBackedCache) Undeploy() error {
-	r.Client.Close()
-	return r.DeploymentStragey.Undeploy()
-}
-
 func (r *RedisBackedCache) Flush(fs api.FileSystem) error {
 	scan := r.Client.Scan(context.Background(), 0, "*", 0)
 	itter := scan.Iterator()
@@ -349,6 +284,54 @@ func (r *RedisBackedCache) Clear() error {
 	return nil
 }
 
+func (r *RedisBackedCache) plugin_ensure() error {
+	if !r.IsConnected() {
+		log.Debug("need to connect to plugin first")
+		err := r.Start()
+		if err != nil {
+			return err
+		}
+		log.Debug("connected to redis_deploy_plugin")
+		r.DeploymentClient = NewRedisDeploymentStrategyClient(r.GetConnection())
+	}
+
+	return nil
+}
+
+func (r *RedisBackedCache) Deploy() error {
+	err := r.plugin_ensure()
+	if err != nil {
+		return err
+	}
+
+	conf := RedisDeploymentConfig{
+		Name: "",
+		Env:  nil,
+	}
+	cnf, err := r.DeploymentClient.Deploy(context.Background(), &conf)
+	r.Config = cnf
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *RedisBackedCache) Undeploy() error {
+	r.Client.Close()
+	err := r.plugin_ensure()
+	if err != nil {
+		return err
+	}
+	Cerr, err := r.DeploymentClient.Undeploy(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	if Cerr != nil && Cerr.GetMessage() != "" {
+		return fmt.Errorf(Cerr.GetMessage())
+	}
+	return nil
+}
+
 func (r *RedisBackedCache) FunctionInjector() api.CacheConfigInjector {
 	return &RedisCacheConfigInjector{system: r}
 }
@@ -385,7 +368,7 @@ func (r *RedisCacheConfigInjector) ConfigureWhisk(action *whisk.Action) error {
 
 	action.Parameters.AddOrReplace(&whisk.KeyValue{
 		Key:   "REDIS_SECRET",
-		Value: &r.system.Config.password,
+		Value: &r.system.Config.Password,
 	})
 
 	return nil
@@ -408,7 +391,7 @@ func (r *RedisCacheConfigInjector) ConfigureLambda(function *lambda.CreateFuncti
 	function.Environment.Variables["REDIS_DB"] = &db
 
 	function.Environment.Variables["REDIS_USER"] = &r.system.Config.User
-	function.Environment.Variables["REDIS_SECRET"] = &r.system.Config.password
+	function.Environment.Variables["REDIS_SECRET"] = &r.system.Config.Password
 
 	mode := 0
 	if r.system.Config.RouteRandomly {

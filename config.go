@@ -46,7 +46,7 @@ func setupDefaults() {
 
 		"cacheSize": uint64(10 * 1024 * 1024), //corosponse to corcache.Local
 
-		"redisDeploymentType":    0,  //corosponse to corcache.Redisx
+		"redisDeploymentType":    "", //corosponse to corcache.Redis
 		"kubernetesNamespace":    "", //
 		"kubernetesStorageClass": "",
 		"redisPort":              nil,

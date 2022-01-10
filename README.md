@@ -255,6 +255,15 @@ Values emitted from a reducer will be stored in tab separated format (i.e. `KEY\
 
 Reducers may maintain state if desired (though not encouraged).
 
+### Intermediate Storage
+TODO
+
+### Tunable
+TODO
+
+## Plugins
+TODO
+
 ## Contributing
 
 Contributions to corral are more than welcomed! In general, the preference is to discuss potential changes in the issues before changes are made.

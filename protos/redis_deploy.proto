@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package redis_cache;
+
+option go_package = "github.com/ISE-SMILE/corral/internal/corcache/redis_cache";
+message Error {
+  optional string message = 1;
+}
+
+message RedisDeploymentConfig {
+  string name = 1;
+  map<string, string> env = 2;
+}
+
+
+message RedisClientConfig {
+  int32 DB = 1;
+  string user = 2;
+  string password = 3;
+  bool RouteByLatency = 4;
+  bool RouteRandomly = 5;
+  repeated string Addrs = 6;
+}
+
+service RedisDeploymentStrategy {
+  rpc Deploy(RedisDeploymentConfig) returns (RedisClientConfig) {};
+  rpc Undeploy(RedisDeploymentConfig) returns (Error) {};
+}
