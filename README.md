@@ -61,45 +61,45 @@ More details about corral's internals can be found in [this blog post](https://b
 Every good MapReduce framework needs a WordCount™ example. Here's how to write a "word count" in corral:
 
 ```golang
+package main
+
 import (
-	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
-
-	"github.com/ISE-SMILE/corral"
+  "fmt"
+  "github.com/ISE-SMILE/corral"
+  "regexp"
+  "strconv"
+  "strings"
 )
-
 
 type wordCount struct{}
 
 func (w wordCount) Map(key, value string, emitter corral.Emitter) {
-	for _, word := range strings.Fields(value) {
-		emitter.Emit(word, "")
-	}
+  for _, word := range strings.Fields(value) {
+    emitter.Emit(word, "")
+  }
 }
 
 func (w wordCount) Reduce(key string, values corral.ValueIterator, emitter corral.Emitter) {
-	count := 0
-	for range values.Iter() {
-		count++
-	}
-	emitter.Emit(key, strconv.Itoa(count))
+  count := 0
+  for range values.Iter() {
+    count++
+  }
+  emitter.Emit(key, strconv.Itoa(count))
 }
 
 func main() {
-	wc := wordCount{}
-	job := corral.NewJob(wc, wc)
+  wc := wordCount{}
+  job := corral.NewJob(wc, wc)
 
-	driver := corral.NewDriver(job)
-	driver.Main()
+  driver := corral.NewDriver(job)
+  driver.Main()
 }
 ```
 
 This can be invoked locally by building/running the above source and adding input files as arguments:
 
 ```sh
-go run word_count.go /path/to/some_file.txt
+go run . /path/to/some_file.txt
 ```
 
 By default, job output will be stored relative to the current directory.
@@ -256,13 +256,34 @@ Values emitted from a reducer will be stored in tab separated format (i.e. `KEY\
 Reducers may maintain state if desired (though not encouraged).
 
 ### Intermediate Storage
-TODO
+
+By default, we can use S3 or Minio as a storage backend, while both are great neither is necessarily build for hundreds nor thousands of functions all accessing them at once to store small packets of data.
+However, we use them this way for Shuffle operations.
+We offer several ways to use other systems as intermediate storage provides that are better suited for the task.
+
+You can use the `config.cache` key to define what kind of intermediate storage should be used.
+We then deploy and configure that cache before starting a job.
+Depending on the selected cache you can expect signficiant perforamnce improvments.
+Note that we use plugins to deploy and manage each selected intermediate storage provider, thus, read the plugin documentation before use.
+
+
 
 ### Tunable
 TODO
 
 ## Plugins
-TODO
+As this project grows, we add more systems that can be used for storages or computation. However, with each added system the dependencies and executable size grows. 
+In order to avoid that, we use a plugin in system of lightweight executables that a driver can start and access using grpc.
+This helps us keep the executable size down and therefore reduces the size of deployed functions.
+However, the plugin system creates a clear tradeoff for security, reliability and coding. 
+For production use, we recommend to either stick to the defaults, i.e. don't use plugins or verify each use plugin your self and compile and install them locally.
+
+Plugins use the `api.Plugin` interface and must implement the relevant services (see `services/'`) to be used. We generate all services using protobuffers, see `protos/`.
+In the following we list all used plugins, a short description what they can do and when we try to use them.
+
+| Name | URL | Usage | Description                                                            |
+| ---  | --- |--|------------------------------------------------------------------------|
+| Redis Deploy | [github.com/ISE-SMILE/corral_redis_deploy](https://github.com/ISE-SMILE/corral_redis_deploy) | loaded for`config.cache="redis"`, use `config.redisDeploymentType` to configure | Used for Redis Cache Deployment, either locally, for kubernetes or AWS | 
 
 ## Contributing
 
