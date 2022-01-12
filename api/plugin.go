@@ -32,8 +32,8 @@ func (p *Plugin) GetConnection() grpc.ClientConnInterface {
 	return p.client
 }
 
-func (p *Plugin) Start() error {
-	p.cmd = exec.Command(p.ExecutableName)
+func (p *Plugin) Start(args ...string) error {
+	p.cmd = exec.Command(p.ExecutableName, args...)
 
 	reader := new(bytes.Buffer)
 	p.cmd.Stdout = reader

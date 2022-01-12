@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ISE-SMILE/corral/api"
+	"github.com/ISE-SMILE/corral/services"
 	"github.com/apache/openwhisk-client-go/whisk"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/go-redis/redis/v8"
@@ -17,12 +18,13 @@ import (
 
 type RedisBackedCache struct {
 	api.Plugin
-	DeploymentClient RedisDeploymentStrategyClient
+	deploymentType   string
+	DeploymentClient services.RedisDeploymentStrategyClient
 	Client           redis.UniversalClient
-	Config           *RedisClientConfig
+	Config           *services.RedisClientConfig
 }
 
-func (rc *RedisClientConfig) asOptions() *redis.UniversalOptions {
+func asOptions(rc *services.RedisClientConfig) *redis.UniversalOptions {
 	return &redis.UniversalOptions{
 		Addrs:          rc.Addrs,
 		DB:             int(rc.DB),
@@ -33,15 +35,21 @@ func (rc *RedisClientConfig) asOptions() *redis.UniversalOptions {
 	}
 }
 
-func NewRedisBackedCache(pluginName string) (*RedisBackedCache, error) {
-	if pluginName == "" {
-		pluginName = "github.com/ISE-SMILE/corral_redis_deploy"
+func NewRedisBackedCache(deploymentType string) (*RedisBackedCache, error) {
+	plugin := api.Plugin{
+		FullName:       "github.com/ISE-SMILE/corral_redis_deploy",
+		ExecutableName: "corral_redis_deploy",
 	}
+
+	err := plugin.Init()
+	if err != nil {
+		log.Debug("failed loading Redis Backend Plugin")
+		return nil, err
+	}
+
 	return &RedisBackedCache{
-		Plugin: api.Plugin{
-			FullName:       pluginName,
-			ExecutableName: "corral_redis_deploy",
-		},
+		Plugin:         plugin,
+		deploymentType: deploymentType,
 	}, nil
 
 }
@@ -54,7 +62,7 @@ func (r *RedisBackedCache) Init() error {
 
 	//we have no config, lets try to make one from the enviroment or fail
 	if r.Config == nil {
-		conf := RedisClientConfig{}
+		conf := services.RedisClientConfig{}
 
 		fail := func(key string) error {
 			return fmt.Errorf("missing client conif and %s not set in enviroment", key)
@@ -111,7 +119,7 @@ func (r *RedisBackedCache) Init() error {
 		r.Config = &conf
 	}
 
-	r.Client = redis.NewUniversalClient(r.Config.asOptions())
+	r.Client = redis.NewUniversalClient(asOptions(r.Config))
 
 	_, err := r.Client.Ping(context.Background()).Result()
 	return err
@@ -287,12 +295,12 @@ func (r *RedisBackedCache) Clear() error {
 func (r *RedisBackedCache) plugin_ensure() error {
 	if !r.IsConnected() {
 		log.Debug("need to connect to plugin first")
-		err := r.Start()
+		err := r.Start(r.deploymentType)
 		if err != nil {
 			return err
 		}
 		log.Debug("connected to redis_deploy_plugin")
-		r.DeploymentClient = NewRedisDeploymentStrategyClient(r.GetConnection())
+		r.DeploymentClient = services.NewRedisDeploymentStrategyClient(r.GetConnection())
 	}
 
 	return nil
@@ -304,7 +312,7 @@ func (r *RedisBackedCache) Deploy() error {
 		return err
 	}
 
-	conf := RedisDeploymentConfig{
+	conf := services.RedisDeploymentConfig{
 		Name: "",
 		Env:  nil,
 	}

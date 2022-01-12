@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package redis_cache;
+package services;
 
-option go_package = "github.com/ISE-SMILE/corral/internal/corcache/redis_cache";
+option go_package = "github.com/ISE-SMILE/corral/services";
 message Error {
   optional string message = 1;
 }
