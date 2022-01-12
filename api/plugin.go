@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bufio"
 	"bytes"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"io"
 	"os/exec"
 )
 
@@ -45,13 +47,20 @@ func (p *Plugin) Start(args ...string) error {
 		}
 	}()
 
-	line, err := reader.ReadBytes('\n')
+	err := p.Interact(reader)
+	return err
+}
 
-	if err != nil {
+func (p *Plugin) Interact(in io.Reader) error {
+	reader := bufio.NewScanner(in)
+	reader.Scan()
+	line := reader.Text()
+
+	if reader.Err() != nil {
 		log.Errorf("Failed to read plugin %s", p.FullName)
 	}
 
-	addr := string(line)
+	addr := line
 
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
