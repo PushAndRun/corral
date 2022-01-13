@@ -7,9 +7,8 @@ import (
 )
 
 func TestInitFilesystem(t *testing.T) {
-	fs, err := InitFilesystem(S3)
+	fs, _ := InitFilesystem(S3)
 	assert.NotNil(t, fs)
-	assert.NotNil(t, err)
 	assert.IsType(t, &S3FileSystem{}, fs)
 
 	fs, _ = InitFilesystem(Local)

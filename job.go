@@ -257,7 +257,9 @@ func (j *Job) inputSplits(inputs []string, maxSplitSize int64) []InputSplit {
 }
 
 func (j *Job) done() {
-	j.metrics.Reset()
+	if j.metrics != nil {
+		j.metrics.Reset()
+	}
 }
 
 //needs to run in a process

@@ -30,7 +30,7 @@ func TestPackInputSplits(t *testing.T) {
 		}
 
 		splitsSeen := 0
-		bins := api.packInputSplits(splits, test.maxBinSize)
+		bins := packInputSplits(splits, test.maxBinSize)
 		for _, bin := range bins {
 			binSize := int64(0)
 			splitsSeen += len(bin)
@@ -62,7 +62,7 @@ func TestCalculateInputSplits(t *testing.T) {
 			Size: test.fileSize,
 		}
 
-		splits := api.splitInputFile(fInfo, test.maxSplitSize)
+		splits := splitInputFile(fInfo, test.maxSplitSize)
 
 		assert.Equal(t, len(test.expectedSplitStarts), len(splits), fmt.Sprintln(splits))
 		for i, split := range splits {
@@ -94,7 +94,7 @@ func TestSplitSize(t *testing.T) {
 
 func TestCountingSplitFunc(t *testing.T) {
 	var bytesRead int64
-	splitFunc := api.countingSplitFunc(bufio.ScanLines, &bytesRead)
+	splitFunc := countingSplitFunc(bufio.ScanLines, &bytesRead)
 
 	buf := new(bytes.Buffer)
 	buf.Write([]byte("foo\n123456\na"))

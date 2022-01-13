@@ -58,7 +58,8 @@ func TestLocalCache_WriteToMuch(t *testing.T) {
 	w, err := local.OpenWriter("/test_test")
 	assert.Nil(t, err)
 
-	_, err = w.Write(make([]byte, 200))
+	_, err = w.Write(make([]byte, 256))
+
 	assert.NotNil(t, err)
 }
 

@@ -24,9 +24,8 @@ func (p *Plugin) Init() error {
 		packageName = packageName + "@latest"
 	}
 	cmd := exec.Command("go", "install", packageName)
-	err := cmd.Run()
+	b, err := cmd.CombinedOutput()
 	if err != nil {
-		b, _ := cmd.CombinedOutput()
 		log.Errorf("Failed to install plugin %s with %+v\n%s", p.FullName, err, string(b))
 	}
 	p.ready = true

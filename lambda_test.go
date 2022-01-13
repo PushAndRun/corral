@@ -3,7 +3,7 @@ package corral
 import (
 	"encoding/json"
 	"github.com/ISE-SMILE/corral/internal/compute/corlambda"
-	"github.com/ISE-SMILE/corral/internal/corcache"
+	"github.com/ISE-SMILE/corral/internal/corfs"
 	"os"
 	"testing"
 	"time"
@@ -35,7 +35,7 @@ func TestHandleRequest(t *testing.T) {
 		BinID:            0,
 		IntermediateBins: 10,
 		Splits:           []InputSplit{},
-		FileSystemType:   corcache.Local,
+		FileSystemType:   corfs.Local,
 		WorkingLocation:  ".",
 	}
 

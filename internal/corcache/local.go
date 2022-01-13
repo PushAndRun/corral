@@ -33,7 +33,12 @@ type WriteCloser struct {
 }
 
 func (w *WriteCloser) Write(p []byte) (n int, err error) {
-	return w.Buffer.Write(p)
+	if w.lmp.size+uint64(len(p)) > w.lmp.maxSize {
+		return 0, fmt.Errorf("Cache Overflow, rejected write.")
+	} else {
+		return w.Buffer.Write(p)
+	}
+
 }
 
 func (w *WriteCloser) Close() error {
