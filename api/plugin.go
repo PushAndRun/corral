@@ -2,11 +2,12 @@ package api
 
 import (
 	"bufio"
-	"bytes"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"io"
 	"os/exec"
+	"strings"
 )
 
 type Plugin struct {
@@ -14,16 +15,26 @@ type Plugin struct {
 	ExecutableName string `json:"executable"` // Name of the executable installed by go install
 	client         *grpc.ClientConn
 	cmd            *exec.Cmd
+	ready          bool
 }
 
 func (p *Plugin) Init() error {
-	cmd := exec.Command("go", "-u", "install", p.FullName)
+	packageName := p.FullName
+	if !strings.Contains(packageName, "@") {
+		packageName = packageName + "@latest"
+	}
+	cmd := exec.Command("go", "install", packageName)
 	err := cmd.Run()
 	if err != nil {
-		log.Errorf("Failed to install plugin %s", p.FullName)
+		b, _ := cmd.CombinedOutput()
+		log.Errorf("Failed to install plugin %s with %+v\n%s", p.FullName, err, string(b))
 	}
-
+	p.ready = true
 	return err
+}
+
+func (p *Plugin) IsReady() bool {
+	return p.ready
 }
 
 func (p *Plugin) IsConnected() bool {
@@ -37,38 +48,40 @@ func (p *Plugin) GetConnection() grpc.ClientConnInterface {
 func (p *Plugin) Start(args ...string) error {
 	p.cmd = exec.Command(p.ExecutableName, args...)
 
-	reader := new(bytes.Buffer)
-	p.cmd.Stdout = reader
+	reader, err := p.cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
 
-	go func() {
-		err := p.cmd.Run()
-		if err != nil {
-			log.Errorf("Failed to start plugin %s", p.FullName)
-		}
-	}()
+	err = p.cmd.Start()
+	if err != nil {
+		log.Errorf("Failed to start plugin %s", p.FullName)
+	}
 
-	err := p.Interact(reader)
+	err = p.Interact(reader)
 	return err
 }
 
 func (p *Plugin) Interact(in io.Reader) error {
 	reader := bufio.NewScanner(in)
-	reader.Scan()
-	line := reader.Text()
+	for reader.Scan() {
+		line := reader.Text()
 
-	if reader.Err() != nil {
-		log.Errorf("Failed to read plugin %s", p.FullName)
+		if reader.Err() != nil {
+			log.Errorf("Failed to read plugin %s", p.FullName)
+		}
+
+		addr := line
+
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
+		if err != nil {
+			log.Errorf("[%s] Failed to connect to plugin at %s : %+v", p.FullName, addr, err)
+		}
+
+		p.client = conn
+		return err
 	}
-
-	addr := line
-
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
-	if err != nil {
-		log.Errorf("[%s] Failed to connect to plugin at %s : %+v", p.FullName, addr, err)
-	}
-
-	p.client = conn
-	return err
+	return fmt.Errorf("failed to interact with process")
 }
 
 func (p *Plugin) Stop() {

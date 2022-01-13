@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// FileSystemType is an identifier for supported FileSystems
+// CacheSystemType is an identifier for supported FileSystems
 type CacheSystemType int
 
 // Identifiers for supported FileSystemTypes
@@ -20,7 +20,7 @@ const (
 	EFS
 )
 
-// NewCacheSystem intializes a CacheSystem of the given type
+// NewCacheSystem initializes a CacheSystem of the given type
 func NewCacheSystem(fsType CacheSystemType) (api.CacheSystem, error) {
 	var cs api.CacheSystem
 
@@ -47,7 +47,7 @@ func NewCacheSystem(fsType CacheSystemType) (api.CacheSystem, error) {
 	return cs, nil
 }
 
-// CacheSystemTypes retunrs a type for a given CacheSystem or the NoCache type.
+// CacheSystemTypes returns a CacheSystemType for a given CacheSystem pointer or the NoCache type.
 func CacheSystemTypes(fs api.CacheSystem) CacheSystemType {
 	if fs == nil {
 		return NoCache
@@ -56,5 +56,10 @@ func CacheSystemTypes(fs api.CacheSystem) CacheSystemType {
 	if _, ok := fs.(*LocalCache); ok {
 		return Local
 	}
+
+	if _, ok := fs.(*redis_cache.RedisBackedCache); ok {
+		return Redis
+	}
+
 	return NoCache
 }

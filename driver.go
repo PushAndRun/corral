@@ -359,14 +359,21 @@ func (d *Driver) run() {
 	}
 
 	if d.cache != nil {
-		err := d.cache.Deploy()
+		err := d.cache.Check()
+		if err != nil {
+			log.Errorf("Cache failed pre-flight checks %+v", err)
+			return
+		}
+		err = d.cache.Deploy()
 		if err != nil {
 			log.Errorf("failed to deploy cache, %+v", err)
+			return
 		}
 
 		err = d.cache.Init()
 		if err != nil {
 			log.Errorf("failed to initilized cache, %+v", err)
+			return
 		}
 	}
 

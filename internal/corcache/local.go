@@ -174,6 +174,10 @@ func (l *LocalCache) Undeploy() error {
 	return nil
 }
 
+func (l *LocalCache) Check() error {
+	return nil
+}
+
 func (l *LocalCache) Flush(fs api.FileSystem) error {
 	errors := make([]error, 0)
 

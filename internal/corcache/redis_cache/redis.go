@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/go-redis/redis/v8"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"io"
 	"os"
 	"strconv"
@@ -39,12 +40,6 @@ func NewRedisBackedCache(deploymentType string) (*RedisBackedCache, error) {
 	plugin := api.Plugin{
 		FullName:       "github.com/ISE-SMILE/corral_redis_deploy",
 		ExecutableName: "corral_redis_deploy",
-	}
-
-	err := plugin.Init()
-	if err != nil {
-		log.Debug("failed loading Redis Backend Plugin")
-		return nil, err
 	}
 
 	return &RedisBackedCache{
@@ -293,6 +288,15 @@ func (r *RedisBackedCache) Clear() error {
 }
 
 func (r *RedisBackedCache) plugin_ensure() error {
+
+	if !r.Plugin.IsReady() {
+		err := r.Plugin.Init()
+		if err != nil {
+			log.Debug("failed loading Redis Backend Plugin")
+			return err
+		}
+	}
+
 	if !r.IsConnected() {
 		log.Debug("need to connect to plugin first")
 		err := r.Start(r.deploymentType)
@@ -312,9 +316,16 @@ func (r *RedisBackedCache) Deploy() error {
 		return err
 	}
 
+	//TODO XXX we should probably only forwarded prefixed keys to ensue we don't leak data to a process over an unsecured local connection but...
+	env := make(map[string]string)
+	for k, v := range viper.AllSettings() {
+		//that is unsafe...
+		env[k] = fmt.Sprintf("%+v", v)
+	}
+
 	conf := services.RedisDeploymentConfig{
-		Name: "",
-		Env:  nil,
+		Name: r.deploymentType,
+		Env:  env,
 	}
 	cnf, err := r.DeploymentClient.Deploy(context.Background(), &conf)
 	r.Config = cnf
@@ -330,7 +341,7 @@ func (r *RedisBackedCache) Undeploy() error {
 	if err != nil {
 		return err
 	}
-	Cerr, err := r.DeploymentClient.Undeploy(context.Background(), nil)
+	Cerr, err := r.DeploymentClient.Undeploy(context.Background(), &services.RedisDeploymentConfig{})
 	if err != nil {
 		return err
 	}
@@ -338,6 +349,10 @@ func (r *RedisBackedCache) Undeploy() error {
 		return fmt.Errorf(Cerr.GetMessage())
 	}
 	return nil
+}
+
+func (r *RedisBackedCache) Check() error {
+	return r.plugin_ensure()
 }
 
 func (r *RedisBackedCache) FunctionInjector() api.CacheConfigInjector {
@@ -414,6 +429,6 @@ func (r *RedisCacheConfigInjector) ConfigureLambda(function *lambda.CreateFuncti
 	return nil
 }
 
-func (r *RedisCacheConfigInjector) CacheSystem() api.CacheSystem {
+func (r *RedisCacheConfigInjector) CacheSystem() api.DeployableCache {
 	return r.system
 }
