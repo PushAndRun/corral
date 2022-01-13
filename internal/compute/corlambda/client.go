@@ -218,6 +218,11 @@ func (l *LambdaClient) updateFunction(function *FunctionConfig) error {
 
 	_, err = l.Client.UpdateFunctionCode(updateArgs)
 	//XXX: should we delete the deployment zip if this fails?
+	//Wait until function is updated...
+	l.Client.WaitUntilFunctionUpdated(&lambda.GetFunctionConfigurationInput{
+		FunctionName: aws.String(function.Name),
+	})
+
 	return err
 }
 
@@ -261,13 +266,18 @@ func (l *LambdaClient) createFunction(function *FunctionConfig) error {
 	}
 
 	f, err := l.Client.CreateFunction(createArgs)
-	if err != nil {
-		log.Errorf("failed to create function %+v", err)
-	}
-
 	if f != nil {
 		log.Infof("created function %s", f.String())
 	}
+	if err != nil {
+		log.Errorf("failed to create function %+v", err)
+		return err
+	}
+
+	err = l.Client.WaitUntilFunctionExists(&lambda.GetFunctionInput{
+		FunctionName: f.FunctionArn,
+		Qualifier:    nil,
+	})
 
 	//XXX: should we delete the deployment zip if this fails?
 	return err
