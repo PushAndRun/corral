@@ -477,7 +477,7 @@ var undeploy = flag.Bool("undeploy", false, "Undeploy the Lambda function and IA
 
 // Main starts the Driver, running the submitted jobs.
 func (d *Driver) Main() {
-
+	defer api.StopAllRunningPlugins()
 	//log.SetLevel(log.DebugLevel)
 	if viper.GetBool("verbose") || *verbose {
 		log.SetLevel(log.DebugLevel)
@@ -511,6 +511,7 @@ func (d *Driver) Main() {
 		}
 		f.Close()
 	}
+
 }
 
 func (d *Driver) Execute() {

@@ -10,6 +10,21 @@ import (
 	"strings"
 )
 
+var startedPlugins []*Plugin = make([]*Plugin, 0)
+
+func RegisterRunningPlugin(p *Plugin) {
+	startedPlugins = append(startedPlugins, p)
+}
+
+func StopAllRunningPlugins() {
+	if startedPlugins != nil {
+		for _, r := range startedPlugins {
+			r.Stop()
+		}
+		startedPlugins = make([]*Plugin, 0)
+	}
+}
+
 type Plugin struct {
 	FullName       string `json:"name"`       // FullName of the plugin, must be a go `get`-able package
 	ExecutableName string `json:"executable"` // Name of the executable installed by go install
@@ -56,6 +71,7 @@ func (p *Plugin) Start(args ...string) error {
 	if err != nil {
 		log.Errorf("Failed to start plugin %s", p.FullName)
 	}
+	RegisterRunningPlugin(p)
 
 	err = p.Interact(reader)
 	return err
