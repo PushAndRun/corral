@@ -6,7 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ISE-SMILE/corral/internal/compute/corwhisk"
+	corwhisk2 "github.com/ISE-SMILE/corral/compute/corwhisk"
 	io2 "github.com/ISE-SMILE/corral/internal/corfs"
 	"io"
 	"io/ioutil"
@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -107,23 +108,42 @@ func handleWhiskHint(out io.Writer) {
 }
 
 type whiskExecutor struct {
-	corwhisk.WhiskClientApi
+	corwhisk2.WhiskClientApi
 	functionName string
 }
 
 func newWhiskExecutor(functionName string) *whiskExecutor {
 	ctx := context.Background()
 
-	config := corwhisk.WhiskClientConfig{
-		RequestPerMinute: viper.GetInt64("requestPerMinute"),
-		ConcurrencyLimit: viper.GetInt("requestBurstRate"),
-		Host:             viper.GetString("whiskHost"),
-		Token:            viper.GetString("whiskToken"),
-		Context:          ctx,
+	var address *string = nil
+	if viper.GetBool("callback") {
+		addr := ""
+		var err error
+		if viper.IsSet("ip") {
+			addr = viper.GetString("ip")
+		} else {
+			addr, err = selectIP()
+			if err != nil {
+				panic(err)
+			}
+		}
+		address = &addr
+	}
+
+	config := corwhisk2.WhiskClientConfig{
+		RequestPerMinute:       viper.GetInt64("requestPerMinute"),
+		ConcurrencyLimit:       viper.GetInt("requestBurstRate"),
+		Host:                   viper.GetString("whiskHost"),
+		Token:                  viper.GetString("whiskToken"),
+		Context:                ctx,
+		BatchRequestFeature:    viper.GetBool("eventBatching"),
+		MultiDeploymentFeature: viper.GetBool("multiDeploy"),
+		WriteMetrics:           viper.GetBool("verbose"),
+		Address:                address,
 	}
 
 	return &whiskExecutor{
-		WhiskClientApi: corwhisk.NewWhiskClient(config),
+		WhiskClientApi: corwhisk2.NewWhiskClient(config),
 		functionName:   functionName,
 	}
 }
@@ -210,7 +230,7 @@ func loop() {
 			}
 		}
 
-		var invocation corwhisk.WhiskPayload
+		var invocation corwhisk2.WhiskPayload
 		var payload task
 		//Manage input parsing...
 		if value, ok := input["value"].(map[string]interface{}); ok {
@@ -308,6 +328,9 @@ func prepareWhiskResult(payload io.ReadCloser) taskResult {
 }
 
 func (l *whiskExecutor) BatchRunMapper(job *Job, jobNumber int, inputSplits [][]InputSplit) error {
+	if !viper.IsSet("eventBatching") || !viper.IsSet("callback") {
+		return fmt.Errorf("can't use batch reducer if eventBatching and callback flags are not set")
+	}
 	tasks := make([]task, 0)
 	for binID, bin := range inputSplits {
 		tasks = append(tasks, task{
@@ -321,7 +344,6 @@ func (l *whiskExecutor) BatchRunMapper(job *Job, jobNumber int, inputSplits [][]
 		})
 	}
 
-	//TODO:
 	resp, err := l.InvokeBatch(l.functionName, tasks)
 	if err != nil {
 		log.Warnf("invocation failed with err:%+v", err)
@@ -345,7 +367,9 @@ func (l *whiskExecutor) BatchRunMapper(job *Job, jobNumber int, inputSplits [][]
 }
 
 func (l *whiskExecutor) BatchRunReducer(job *Job, jobNumber int, bins []uint) error {
-
+	if !viper.IsSet("callback") {
+		return fmt.Errorf("can't use batch reducer if eventBatching and callback flags are not set")
+	}
 	tasks := make([]task, 0)
 	for _, binID := range bins {
 		tasks = append(tasks, task{
@@ -428,7 +452,7 @@ func (l *whiskExecutor) RunReducer(job *Job, jobNumber int, binID uint) error {
 }
 
 func (l *whiskExecutor) Deploy(driver *Driver) error {
-	conf := corwhisk.WhiskFunctionConfig{
+	conf := corwhisk2.WhiskFunctionConfig{
 		FunctionName: l.functionName,
 		Memory:       viper.GetInt("lambdaMemory"),
 		Timeout:      viper.GetInt("lambdaTimeout") * 1000,
@@ -457,10 +481,77 @@ func (l *whiskExecutor) Undeploy() error {
 }
 
 func (l *whiskExecutor) WaitForBatch(resp []interface{}) ([]taskResult, error) {
-	//TODO: use a callback hook from OpenWhisk
-	return nil, fmt.Errorf("not yet implemented")
+	set := NewConcurrentSet()
+	set.AddAll(resp)
+
+	results := l.ReceiveUntil(func() bool {
+		return set.IsEmpty()
+	})
+
+	taskResults := make([]taskResult, 0)
+	ctx, _ := context.WithTimeout(context.Background(), 15*time.Minute)
+	for {
+		select {
+		case resp, ok := <-results:
+			if !ok {
+				return taskResults, nil
+			} else {
+				taskResult := prepareWhiskResult(resp)
+				taskResults = append(taskResults, taskResult)
+				set.Remove(taskResult.RId)
+			}
+		case <-ctx.Done():
+			return taskResults, fmt.Errorf("timed out to wait for BatchResults")
+		}
+	}
 }
 
 func (l *whiskExecutor) InvokeBatch(functionName string, tasks []task) ([]interface{}, error) {
-	return nil, fmt.Errorf("not yet implemented")
+	errors := make([]error, 0)
+	iids := make([]interface{}, 0)
+
+	if !viper.IsSet("eventBatching") {
+		log.Info("batching Events using async")
+
+		for _, t := range tasks {
+			iid, err := l.InvokeAsync(l.functionName, t)
+			if err != nil {
+				log.Debugf("failed to send [j:%d|p:%d,b:%d] - %+v", t.JobNumber, t.Phase, t.BinID, err)
+				errors = append(errors, err)
+			}
+			if iid != nil && iid.(string) != "" {
+				iids = append(iids, iid.(string))
+			} else {
+				log.Debugf("no invocation id for [j:%d|p:%d,b:%d]", t.JobNumber, t.Phase, t.BinID)
+				errors = append(errors, fmt.Errorf("missing invocation references"))
+			}
+		}
+
+	} else {
+		batchSize := viper.GetInt("eventBatchSize")
+		for i := 0; i < len(tasks); i += batchSize {
+			end := i + batchSize
+
+			if end > len(tasks) {
+				end = len(tasks)
+			}
+
+			task := tasks[i:end]
+			taskBatch := make([]interface{}, len(task))
+			for i := range task {
+				taskBatch[i] = task[i]
+			}
+			ids, err := l.InvokeAsBatch(l.functionName, taskBatch)
+			if err != nil {
+				errors = append(errors, err)
+			}
+			iids = append(iids, ids...)
+		}
+	}
+
+	if len(errors) > 0 {
+		return iids, fmt.Errorf("%d/%d errors during batch invocation", len(errors), len(tasks))
+	} else {
+		return iids, nil
+	}
 }

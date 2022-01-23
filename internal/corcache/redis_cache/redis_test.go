@@ -53,4 +53,5 @@ func Test_SmokeTest(t *testing.T) {
 		t.Fatal(err)
 		return
 	}
+	rc.Stop()
 }

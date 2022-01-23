@@ -3,6 +3,8 @@ package corral
 import (
 	"bufio"
 	"encoding/base64"
+	"fmt"
+	"net"
 	"os"
 	"strings"
 )
@@ -47,4 +49,22 @@ func randomName() string {
 	}
 
 	return sb.String()
+}
+
+func selectIP() (string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		fmt.Printf("Unable to get interface addresses: %v", err)
+		return "", err
+	}
+
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String(), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("failed to find valid ip")
 }

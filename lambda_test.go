@@ -2,7 +2,7 @@ package corral
 
 import (
 	"encoding/json"
-	"github.com/ISE-SMILE/corral/internal/compute/corlambda"
+	"github.com/ISE-SMILE/corral/compute/corlambda"
 	"github.com/ISE-SMILE/corral/internal/corfs"
 	"os"
 	"testing"

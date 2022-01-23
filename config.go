@@ -51,6 +51,7 @@ func setupDefaults() {
 		"kubernetesStorageClass": "",
 		"redisPort":              nil,
 	}
+	setupFlags(&defaultSettings)
 	for key, value := range defaultSettings {
 		viper.SetDefault(key, value)
 	}

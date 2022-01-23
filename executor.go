@@ -12,5 +12,4 @@ type smileExecutor interface {
 	executor
 	BatchRunMapper(job *Job, jobNumber int, inputSplits [][]InputSplit) error
 	BatchRunReducer(job *Job, jobNumber int, bins []uint) error
-	//TODO: implement Join/Split/Shuffle?
 }

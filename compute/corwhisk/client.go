@@ -1,21 +1,19 @@
 package corwhisk
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/ISE-SMILE/corral/api"
-	"github.com/ISE-SMILE/corral/internal/compute/build"
+	"github.com/ISE-SMILE/corral/compute/build"
 	"github.com/ISE-SMILE/corral/internal/cormetics"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
+	"net/url"
 	"strings"
 	"time"
 
@@ -26,12 +24,6 @@ import (
 )
 
 const MaxPullRetries = 4
-
-type WhiskClientApi interface {
-	Invoke(name string, payload interface{}) (io.ReadCloser, error)
-	DeployFunction(conf WhiskFunctionConfig) error
-	DeleteFunction(name string) error
-}
 
 type WhiskClient struct {
 	Client           *whisk.Client
@@ -46,160 +38,20 @@ type WhiskClient struct {
 	server      net.Listener
 	activations chan io.ReadCloser
 
+	multiDeploymentFeature bool
+	deployments            map[string][]WhiskFunctionConfig
+
 	metrics *cormetics.Metrics
 }
 
-type WhiskClientConfig struct {
-	RequestPerMinute int64
-	ConcurrencyLimit int
-
-	Host      string
-	Token     string
-	Namespace string
-
-	Context           context.Context
-	RemoteLoggingHost string
-
-	BatchRequestFeature    bool
-	MultiDeploymentFeatrue bool
-	WriteMetics            bool
-
-	Address *string
-}
-
-type WhiskCacheConfigInjector interface {
-	api.CacheConfigInjector
-	ConfigureWhisk(action *whisk.Action) error
-}
-
-type WhiskFunctionConfig struct {
-	Memory              int
-	Timeout             int
-	FunctionName        string
-	CacheConfigInjector api.CacheConfigInjector
-}
-
 var propsPath string
-
-func init() {
-	home, err := os.UserHomeDir()
-	if err == nil {
-		propsPath = filepath.Join(home, ".wskprops")
-	} else {
-		//best effort this will prop. work on unix and osx ;)
-		propsPath = filepath.Join("~", ".wskprops")
-	}
-}
-
-func readProps(in io.ReadCloser) map[string]string {
-	defer in.Close()
-
-	props := make(map[string]string)
-
-	reader := bufio.NewScanner(in)
-
-	for reader.Scan() {
-		line := reader.Text()
-		data := strings.SplitN(line, "=", 2)
-		if len(data) < 2 {
-			//This might leek user private data into a log...
-			log.Errorf("could not read prop line %s", line)
-		}
-		props[data[0]] = data[1]
-	}
-	return props
-}
-
-func readEnviron() map[string]string {
-	env := make(map[string]string)
-	for _, e := range os.Environ() {
-		data := strings.SplitN(e, "=", 2)
-		if len(data) < 2 {
-			//This might leek user private data into a log...
-			log.Errorf("could not read prop line %s", e)
-		}
-		env[data[0]] = data[1]
-	}
-	return env
-}
-
-func whiskClient(conf WhiskClientConfig) (*whisk.Client, error) {
-	// lets first check the config
-	host := conf.Host
-	token := conf.Token
-	var namespace = "_"
-
-	if token == "" {
-		//2. check if wskprops exsist
-		if _, err := os.Stat(propsPath); err == nil {
-			//. attempt to read and parse props
-			if props, err := os.Open(propsPath); err == nil {
-				host, token, namespace = setAtuhFromProps(readProps(props))
-			}
-			//3. fallback try to check the env for token
-		} else {
-			host, token, namespace = setAtuhFromProps(readEnviron())
-		}
-	}
-
-	if token == "" {
-		log.Warn("did not find a token for the whisk client!")
-	}
-
-	if conf.Namespace != "" {
-		namespace = conf.Namespace
-	}
-
-	baseurl, _ := whisk.GetURLBase(host, "/api")
-	clientConfig := &whisk.Config{
-		Namespace:        namespace,
-		AuthToken:        token,
-		Host:             host,
-		BaseURL:          baseurl,
-		Version:          "v1",
-		Verbose:          true,
-		Insecure:         true,
-		UserAgent:        "Golang/Smile cli",
-		ApigwAccessToken: "Dummy Token",
-	}
-
-	client, err := whisk.NewClient(http.DefaultClient, clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
-//check props and env vars for relevant infomation ;)
-func setAtuhFromProps(auth map[string]string) (string, string, string) {
-	var host string
-	var token string
-	var namespace string
-	if apihost, ok := auth["APIHOST"]; ok {
-		host = apihost
-	} else if apihost, ok := auth["__OW_API_HOST"]; ok {
-		host = apihost
-	}
-	if apitoken, ok := auth["AUTH"]; ok {
-		token = apitoken
-	} else if apitoken, ok := auth["__OW_API_KEY"]; ok {
-		token = apitoken
-	}
-	if apinamespace, ok := auth["NAMESPACE"]; ok {
-		namespace = apinamespace
-	} else if apinamespace, ok := auth["__OW_NAMESPACE"]; ok {
-		namespace = apinamespace
-	}
-	return host, token, namespace
-}
 
 // MaxLambdaRetries is the number of times to try invoking a function
 // before giving up and returning an error
 const MaxRetries = 3
 
 // NewWhiskClient initializes a new openwhisk client
-func NewWhiskClient(conf WhiskClientConfig) *WhiskClient {
+func NewWhiskClient(conf WhiskClientConfig) WhiskClientApi {
 	client, err := whiskClient(conf)
 	if err != nil {
 		panic(fmt.Errorf("could not init whisk client - %+v", err))
@@ -222,7 +74,7 @@ func NewWhiskClient(conf WhiskClientConfig) *WhiskClient {
 	}
 
 	var metrics *cormetics.Metrics
-	if conf.WriteMetics {
+	if conf.WriteMetrics {
 		metrics, err = cormetics.CollectMetrics(map[string]string{
 			"RId":   "request id",
 			"start": "request submitted",
@@ -239,94 +91,148 @@ func NewWhiskClient(conf WhiskClientConfig) *WhiskClient {
 		panic(fmt.Errorf("could not init whisk client - %+v", err))
 	}
 	return &WhiskClient{
-		Client:           client,
-		spawn:            limiter,
-		ctx:              conf.Context,
-		address:          conf.Address,
-		activations:      make(chan io.ReadCloser),
-		metrics:          metrics,
-		ConcurrencyLimit: &conf.ConcurrencyLimit,
+		Client:                 client,
+		multiDeploymentFeature: conf.MultiDeploymentFeature,
+		spawn:                  limiter,
+		ctx:                    conf.Context,
+		address:                conf.Address,
+		activations:            make(chan io.ReadCloser),
+		metrics:                metrics,
+		ConcurrencyLimit:       &conf.ConcurrencyLimit,
 	}
-}
-
-type WhiskPayload struct {
-	Value interface{}        `json:"value"`
-	Env   map[string]*string `json:"env"`
 }
 
 func (l *WhiskClient) Invoke(name string, payload interface{}) (io.ReadCloser, error) {
 	return l.tryInvoke(name, l.preparePayload(payload))
 }
 
-func (l *WhiskClient) preparePayload(payload interface{}) WhiskPayload {
-	invocation := WhiskPayload{
-		Value: payload,
-		Env:   make(map[string]*string),
+func (l *WhiskClient) InvokeAsync(name string, payload interface{}) (interface{}, error) {
+
+	start, fname, err := l.initInvoke(name)
+	if err != nil {
+		return nil, err
 	}
 
-	build.InjectConfiguration(invocation.Env)
-	strBool := "true"
-	invocation.Env["DEBUG"] = &strBool
-	if l.remoteLoggingHost != "" {
-		invocation.Env["RemoteLoggingHost"] = &l.remoteLoggingHost
+	inv, response, err := l.Client.Actions.Invoke(fname, l.preparePayload(payload), false, false)
+	if err != nil {
+		return nil, fmt.Errorf("could not invoke action - %+v", err)
 	}
-	return invocation
+
+	if response.StatusCode >= 300 {
+		return nil, fmt.Errorf("error invoking action %s - %s", fname, response.Status)
+	}
+
+	if inv != nil {
+		activationId := inv["activationId"]
+		l.startMetricTrace(activationId, start)
+		return activationId, nil
+	} else {
+		return "", nil
+	}
+
 }
 
-func (l *WhiskClient) InvokeAsyn(name string, payload interface{}) error {
-
+func (l *WhiskClient) initInvoke(baseName string) (int64, string, error) {
 	err := l.startCallBackServer()
 	if err != nil {
-		return err
+		return -1, "", err
 	}
 
 	err = l.spawn.Wait(l.ctx)
 	if err != nil {
-		return err
+		return -1, "", err
 	}
 
+	var functionName string = baseName
+	//check if we run with multi deployments
+	if l.multiDeploymentFeature {
+		functionName = l.selectDeployment(baseName)
+	}
 	start := time.Now().UnixMilli()
-	inv, response, err := l.Client.Actions.Invoke(name, l.preparePayload(payload), false, false)
+
+	return start, functionName, err
+}
+
+func (l *WhiskClient) InvokeAsBatch(name string, payloads []interface{}) ([]interface{}, error) {
+	start, fname, err := l.initInvoke(name)
+
+	preparedPayloads := make([]WhiskPayload, len(payloads))
+	for i, payload := range payloads {
+		preparedPayloads[i] = l.preparePayload(payload)
+	}
+
+	req := BatchRequest{
+		preparedPayloads,
+	}
+
+	actionName := (&url.URL{Path: fname}).String()
+	route := fmt.Sprintf("actions/%s?blocking=%t&result=%t&batch=%t", actionName, false, false, true)
+	request, err := l.Client.NewRequest(http.MethodPost, route, req, true)
+
 	if err != nil {
-		return fmt.Errorf("could not invoke action - %+v", err)
+		return nil, err
+	}
+
+	var res map[string]interface{}
+	response, err := l.Client.Do(request, res, false)
+	if err != nil {
+		return nil, err
 	}
 
 	if response.StatusCode >= 300 {
-		return fmt.Errorf("error invoking action %s - %s", name, response.Status)
+		log.Debugf("failed to batch invoce request...")
+		return nil, fmt.Errorf("failed to batch requests")
 	}
 
-	if l.metrics != nil {
-		l.metrics.Collect(map[string]interface{}{
-			"RId":   inv["activationId"],
-			"start": start,
-		})
+	activations := res["activations"].([]interface{})
+
+	for _, activation := range activations {
+		l.startMetricTrace(activation, start)
 	}
 
-	return nil
-}
-
-// returns name and namespace based on function name
-func getQualifiedName(functioname string) (string, string) {
-	var namespace string
-	var action string
-
-	if strings.HasPrefix(functioname, "/") {
-		parts := strings.Split(functioname, "/")
-		namespace = parts[0]
-		action = parts[1]
-	} else {
-		//no namespace set in string using _
-		namespace = "_"
-		action = functioname
-	}
-
-	return action, namespace
-
+	return activations, nil
 }
 
 func (l *WhiskClient) DeployFunction(conf WhiskFunctionConfig) error {
+	buildPackage, codeHashDigest, err := build.BuildPackage("exec")
+	if err != nil {
+		return err
+	}
 
-	actionName, namespace := getQualifiedName(conf.FunctionName)
+	if !l.multiDeploymentFeature {
+		return l.deployFunction(conf, buildPackage, codeHashDigest)
+	} else {
+		if l.deployments == nil {
+			l.deployments = make(map[string][]WhiskFunctionConfig)
+
+			n := viper.GetInt("numMultiDeployments")
+			m := (conf.Memory - viper.GetInt("maxMemory")) / n
+			confs := make([]WhiskFunctionConfig, n)
+			confs[0] = conf
+
+			for i := 1; i < n; i++ {
+				conf.Memory += m
+				confs[i] = conf
+				confs[i].FunctionName = fmt.Sprintf("%s_%d", conf.FunctionName, 0)
+			}
+
+			confs[0].FunctionName = fmt.Sprintf("%s_%d", conf.FunctionName, 0)
+
+			l.deployments[conf.FunctionName] = confs
+		}
+		for _, config := range l.deployments[conf.FunctionName] {
+			err := l.deployFunction(config, buildPackage, codeHashDigest)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func (l *WhiskClient) deployFunction(conf WhiskFunctionConfig, buildPackage []byte, codeHashDigest string) error {
+
+	actionName, namespace := GetQualifiedName(conf.FunctionName)
 
 	if conf.Memory == 0 {
 		conf.Memory = 192
@@ -335,8 +241,6 @@ func (l *WhiskClient) DeployFunction(conf WhiskFunctionConfig) error {
 	if conf.Timeout == 0 {
 		conf.Timeout = int(time.Second * 30)
 	}
-
-	buildPackage, codeHashDigest, err := build.BuildPackage("exec")
 
 	payload := base64.StdEncoding.EncodeToString(buildPackage)
 
@@ -412,8 +316,32 @@ func (l *WhiskClient) DeployFunction(conf WhiskFunctionConfig) error {
 }
 
 func (l *WhiskClient) DeleteFunction(name string) error {
-	_, err := l.Client.Actions.Delete(name)
-	return err
+	if l.multiDeploymentFeature {
+		errors := make([]error, 0)
+		for _, config := range l.deployments[name] {
+			_, err := l.Client.Actions.Delete(config.FunctionName)
+			if err != nil {
+				errors = append(errors, err)
+			}
+		}
+
+		if len(errors) > 0 {
+			return fmt.Errorf("%+v", errors)
+		}
+		return nil
+	} else {
+		_, err := l.Client.Actions.Delete(name)
+		return err
+	}
+}
+
+func (l *WhiskClient) startMetricTrace(activationId interface{}, start int64) {
+	if l.metrics != nil {
+		l.metrics.Collect(map[string]interface{}{
+			"RId":    activationId,
+			"rStart": start,
+		})
+	}
 }
 
 func (l *WhiskClient) fetchActivationMetrics(id string) {
@@ -433,13 +361,8 @@ func (l *WhiskClient) fetchActivationMetrics(id string) {
 func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCloser, error) {
 	failures := make([]error, 0)
 	for i := 0; i < MaxRetries; i++ {
-		err := l.spawn.Wait(l.ctx)
-		if err != nil {
-			//wait canceld form the outside
-			return nil, err
-		}
-		rstart := time.Now().UnixMilli()
-		invoke, response, err := l.Client.Actions.Invoke(name, invocation, true, true)
+		rstart, fname, err := l.initInvoke(name)
+		invoke, response, err := l.Client.Actions.Invoke(fname, invocation, true, true)
 		rend := time.Now().UnixMilli()
 
 		if response == nil && err != nil {
@@ -450,7 +373,7 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 		}
 
 		if response != nil {
-			log.Debugf("invoked %s - %d", name, response.StatusCode)
+			log.Debugf("invoked %s - %d", fname, response.StatusCode)
 			log.Debugf("%+v", invoke)
 			if response.StatusCode == 200 {
 				if l.metrics != nil {
@@ -469,12 +392,7 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 				return response.Body, nil
 			} else if response.StatusCode == 202 {
 				if id, ok := invoke["activationId"]; ok {
-					if l.metrics != nil {
-						l.metrics.Collect(map[string]interface{}{
-							"RId":    invoke["activationId"],
-							"rStart": rstart,
-						})
-					}
+					l.startMetricTrace(invoke["activationId"], rstart)
 					activation, err := l.pollActivation(id.(string))
 					l.spawn.Allow()
 					if err != nil {
@@ -642,4 +560,13 @@ func (l *WhiskClient) accept() {
 			}(conn, l.activations)
 		}
 	}
+}
+
+func (l *WhiskClient) selectDeployment(name string) string {
+	//TODO: for now we do random selection ...
+	configs := l.deployments[name]
+
+	config := configs[rand.Intn(len(configs))]
+
+	return config.FunctionName
 }

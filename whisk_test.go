@@ -2,8 +2,8 @@ package corral
 
 import (
 	"encoding/json"
-	"github.com/ISE-SMILE/corral/internal/compute/build"
-	"github.com/ISE-SMILE/corral/internal/compute/corwhisk"
+	"github.com/ISE-SMILE/corral/compute/build"
+	"github.com/ISE-SMILE/corral/compute/corwhisk"
 	"github.com/ISE-SMILE/corral/internal/corfs"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -153,6 +153,14 @@ func (m *mockWhiskClient) DeployFunction(conf corwhisk.WhiskFunctionConfig) erro
 }
 
 func (m mockWhiskClient) DeleteFunction(name string) error {
+	return nil
+}
+
+func (m mockWhiskClient) InvokeAsync(name string, payload interface{}) (interface{}, error) {
+	return nil, nil
+}
+
+func (m mockWhiskClient) ReceiveUntil(when func() bool) chan io.ReadCloser {
 	return nil
 }
 

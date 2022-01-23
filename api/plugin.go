@@ -105,6 +105,9 @@ func (p *Plugin) Stop() {
 	}
 
 	if p.cmd != nil {
-		_ = p.cmd.Process.Kill()
+		err := p.cmd.Process.Kill()
+		if err != nil {
+			log.Warnf("failed to kill plugin %s - %+V", p.FullName, err)
+		}
 	}
 }

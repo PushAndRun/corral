@@ -1,3 +1,0 @@
-package corwhisk
-
-//TODO:!!

@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ISE-SMILE/corral/api"
-	"github.com/ISE-SMILE/corral/internal/compute/build"
+	"github.com/ISE-SMILE/corral/compute/build"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"os"
 	"strings"

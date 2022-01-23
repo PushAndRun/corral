@@ -68,6 +68,7 @@ type config struct {
 	WorkingLocation string
 	Cleanup         bool
 	Cache           corcache.CacheSystemType
+	Backend         string
 }
 
 func newConfig() *config {
@@ -270,29 +271,40 @@ func (d *Driver) runMapPhase(job *Job, jobNumber int, inputs []string) {
 	bar := pb.New(len(inputBins)).Prefix("Map").Start()
 
 	//tell the platfrom how may invocations we plan on dooing
-	err := d.executor.HintSplits(uint(len(inputBins)))
-	if err != nil {
-		log.Warn("failed to hint platfrom, expect perfromance degredations")
-		log.Debugf("hint error:%+v", err)
+	if viper.GetBool("hinting") {
+		err := d.executor.HintSplits(uint(len(inputBins)))
+		if err != nil {
+			log.Warn("failed to hint platfrom, expect perfromance degredations")
+			log.Debugf("hint error:%+v", err)
+		}
 	}
 
-	var wg sync.WaitGroup
-	sem := semaphore.NewWeighted(int64(d.config.MaxConcurrency))
-	for binID, bin := range inputBins {
-		//XXX: binID casted to uint
-		sem.Acquire(context.Background(), 1)
-		wg.Add(1)
-		go func(bID uint, b []InputSplit) {
-			defer wg.Done()
-			defer sem.Release(1)
-			defer bar.Increment()
-			err := d.executor.RunMapper(job, jobNumber, bID, b)
-			if err != nil {
-				log.Errorf("Error when running mapper %d: %s", bID, err)
-			}
-		}(uint(binID), bin)
+	if viper.GetBool("eventBatching") {
+		sem := d.executor.(smileExecutor)
+		err := sem.BatchRunMapper(job, jobNumber, inputBins)
+		if err != nil {
+			log.Errorf("Error when running batch mapper %s", err)
+		}
+
+	} else {
+		var wg sync.WaitGroup
+		sem := semaphore.NewWeighted(int64(d.config.MaxConcurrency))
+		for binID, bin := range inputBins {
+			//XXX: binID casted to uint
+			sem.Acquire(context.Background(), 1)
+			wg.Add(1)
+			go func(bID uint, b []InputSplit) {
+				defer wg.Done()
+				defer sem.Release(1)
+				defer bar.Increment()
+				err := d.executor.RunMapper(job, jobNumber, bID, b)
+				if err != nil {
+					log.Errorf("Error when running mapper %d: %s", bID, err)
+				}
+			}(uint(binID), bin)
+		}
+		wg.Wait()
 	}
-	wg.Wait()
 	bar.Finish()
 }
 
@@ -301,24 +313,37 @@ func (d *Driver) runReducePhase(job *Job, jobNumber int) {
 	bar := pb.New(int(job.intermediateBins)).Prefix("Reduce").Start()
 
 	//tell the platfrom how may invocations we plan on dooing
-	err := d.executor.HintSplits(job.intermediateBins)
-	if err != nil {
-		log.Warn("failed to hint platfrom, expect perfromance degredations")
-		log.Debugf("hint error:%+v", err)
+	if viper.GetBool("hinting") {
+		err := d.executor.HintSplits(job.intermediateBins)
+		if err != nil {
+			log.Warn("failed to hint platfrom, expect perfromance degredations")
+			log.Debugf("hint error:%+v", err)
+		}
 	}
-
-	for binID := uint(0); binID < job.intermediateBins; binID++ {
-		wg.Add(1)
-		go func(bID uint) {
-			defer wg.Done()
-			defer bar.Increment()
-			err := d.executor.RunReducer(job, jobNumber, bID)
-			if err != nil {
-				log.Errorf("Error when running reducer %d: %s", bID, err)
-			}
-		}(binID)
+	if viper.GetBool("eventBatching") {
+		sem := d.executor.(smileExecutor)
+		bins := make([]uint, job.intermediateBins)
+		for i := 0; i < len(bins); i++ {
+			bins[i] = uint(i)
+		}
+		err := sem.BatchRunReducer(job, jobNumber, bins)
+		if err != nil {
+			log.Errorf("Error when running batch mapper %s", err)
+		}
+	} else {
+		for binID := uint(0); binID < job.intermediateBins; binID++ {
+			wg.Add(1)
+			go func(bID uint) {
+				defer wg.Done()
+				defer bar.Increment()
+				err := d.executor.RunReducer(job, jobNumber, bID)
+				if err != nil {
+					log.Errorf("Error when running reducer %d: %s", bID, err)
+				}
+			}(binID)
+		}
+		wg.Wait()
 	}
-	wg.Wait()
 	bar.Finish()
 }
 
@@ -347,6 +372,9 @@ func (d *Driver) run() {
 	if d.runOnCloudPlatfrom() {
 		log.Warn("Running on FaaS runtime and Returned, this is bad!")
 		os.Exit(-10)
+	}
+	if !validateFlagConfig(d) {
+		panic(fmt.Errorf("failed to validate flags, can't execute"))
 	}
 
 	//TODO: do preflight checks e.g. check if in/out is accassible...
@@ -515,6 +543,7 @@ func (d *Driver) Main() {
 }
 
 func (d *Driver) Execute() {
+	log.Info("Mode [%s]", CompileFlagName())
 	start := time.Now()
 	d.run()
 	end := time.Now()
@@ -530,6 +559,10 @@ func (d *Driver) WithBackend(backendType *string) {
 			d.executor = newWhiskExecutor(viper.GetString("lambdaFunctionName"))
 		} else {
 			log.Warnf("unknowen backend flag %+v", *backendType)
+		}
+
+		if d.config != nil {
+			d.config.Backend = *backendType
 		}
 	}
 }
