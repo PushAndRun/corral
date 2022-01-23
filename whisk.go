@@ -81,7 +81,7 @@ func handleWhiskHook(out io.Writer, hook func(*Job) string) {
 		if job != nil {
 			msg := hook(job)
 			if msg != "" {
-				fmt.Fprintln(out, msg)
+				_, _ = fmt.Fprintln(out, msg)
 			}
 		}
 	}
@@ -99,7 +99,9 @@ func handleWhiskStop(out io.Writer) {
 	})
 }
 
-func handleWhiskFreshen(out io.Writer) {}
+func handleWhiskFreshen(out io.Writer) {
+
+}
 
 func handleWhiskHint(out io.Writer) {
 	handleWhiskHook(out, func(job *Job) string {

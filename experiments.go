@@ -30,7 +30,7 @@ var flags = []string{
 	//data io
 	//ready
 	"caching", //use selective caching to speedup stage computations
-	//todo
+	//prepared
 	"preloading", //preload tables using life-cycle-hooks
 }
 
