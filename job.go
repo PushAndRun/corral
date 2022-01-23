@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ISE-SMILE/corral/api"
-	"github.com/ISE-SMILE/corral/internal/cormetics"
 	humanize "github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
@@ -34,7 +33,7 @@ type Job struct {
 
 	bytesRead    int64
 	bytesWritten int64
-	metrics      *cormetics.Metrics
+	metrics      *api.Metrics
 }
 
 //type SortFunc func() int
@@ -264,7 +263,7 @@ func (j *Job) done() {
 
 //needs to run in a process
 func (j *Job) CollectMetrics() {
-	metrics, err := cormetics.CollectMetrics(map[string]string{
+	metrics, err := api.CollectMetrics(map[string]string{
 		"RId":          "request identifier",
 		"CId":          "container identifier",
 		"HId":          "vm id",

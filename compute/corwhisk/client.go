@@ -6,8 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/ISE-SMILE/corral/api"
 	"github.com/ISE-SMILE/corral/compute/build"
-	"github.com/ISE-SMILE/corral/internal/cormetics"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -41,7 +41,7 @@ type WhiskClient struct {
 	multiDeploymentFeature bool
 	deployments            map[string][]WhiskFunctionConfig
 
-	metrics *cormetics.Metrics
+	metrics *api.Metrics
 }
 
 var propsPath string
@@ -73,9 +73,9 @@ func NewWhiskClient(conf WhiskClientConfig) WhiskClientApi {
 		conf.Context = context.Background()
 	}
 
-	var metrics *cormetics.Metrics
+	var metrics *api.Metrics
 	if conf.WriteMetrics {
-		metrics, err = cormetics.CollectMetrics(map[string]string{
+		metrics, err = api.CollectMetrics(map[string]string{
 			"RId":   "request id",
 			"start": "request submitted",
 			"end":   "request completed",

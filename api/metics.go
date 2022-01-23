@@ -1,4 +1,4 @@
-package cormetics
+package api
 
 import (
 	"bufio"
