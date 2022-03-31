@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-//takes a driver and a
+//takes a driver and a hostID and requestID and returns the main worker function for these parameters
 func handle(driver *Driver, hostID func() string, requestID func() string) func(task task) (taskResult, error) {
 	return func(task task) (taskResult, error) {
 		estart := time.Now()

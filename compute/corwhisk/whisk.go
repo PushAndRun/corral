@@ -93,7 +93,7 @@ func whiskClient(conf WhiskClientConfig) (*whisk.Client, error) {
 		Version:          "v1",
 		Verbose:          true,
 		Insecure:         true,
-		UserAgent:        "Golang/Smile cli",
+		UserAgent:        "Golang/Smile Corral",
 		ApigwAccessToken: "Dummy Token",
 	}
 
@@ -115,6 +115,7 @@ type OWInfoResponse struct {
 		BatchRequestFeature bool `json:"batch"`
 		CallbackFeature     bool `json:"feedback"`
 		LCHFeature          bool `json:"lch"`
+		HintingFeature      bool `json:"hinting"`
 	} `json:"features,omitempty"`
 	Limits struct {
 		ActionsPerMinute  int64 `json:"actions_per_minute"`
@@ -126,7 +127,7 @@ type OWInfoResponse struct {
 	} `json:"limits,omitempty"`
 }
 
-//ensurePlatformConfig checks if openwhisk implements required plafrom features
+//ensurePlatformConfig checks if openwhisk implements required plaform features
 func ensurePlatformConfig(host string, conf WhiskClientConfig) error {
 
 	req, err := http.NewRequest(http.MethodGet, host, nil)
@@ -149,26 +150,30 @@ func ensurePlatformConfig(host string, conf WhiskClientConfig) error {
 			return fmt.Errorf("could not parese platform %+v info", err)
 		}
 
-		if conf.MultiDeploymentFeature || conf.BatchRequestFeature || conf.Address != nil {
-			if rw.Features.BatchRequestFeature != conf.BatchRequestFeature {
+		if conf.MultiDeploymentFeature || conf.BatchRequestFeature || conf.Address != nil || conf.HintingFeature {
+			if conf.BatchRequestFeature && !rw.Features.BatchRequestFeature {
 				return fmt.Errorf("platform dose not support batch request feautre")
 			}
 
-			if conf.Address == nil && rw.Features.CallbackFeature {
+			if conf.Address != nil && !rw.Features.CallbackFeature {
 				return fmt.Errorf("platform dose not support callback feature")
 			}
 
-			if rw.Features.LCHFeature != conf.DataPreloadingFeature {
+			if conf.DataPreloadingFeature && !rw.Features.LCHFeature {
 				return fmt.Errorf("platform dose not support data preloading feature")
+			}
+
+			if conf.HintingFeature && !rw.Features.HintingFeature {
+				return fmt.Errorf("platform dose not support hinting feature")
 			}
 		}
 
 		if conf.RequestPerMinute > rw.Limits.ActionsPerMinute {
-			return fmt.Errorf("plaform has lower request per minute then requried by config")
+			log.Warn("platform has lower request per minute then required by config")
 		}
 
 		if conf.ConcurrencyLimit > rw.Limits.ConcurrentActions {
-			return fmt.Errorf("platform concurrent limit lower then requried by config")
+			log.Warn("platform concurrent limit lower then required by config")
 		}
 	} else {
 		return fmt.Errorf("platfrom verifcation response invalid")

@@ -3,6 +3,7 @@ package corral
 import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"time"
 )
 
 func loadConfig() {
@@ -41,8 +42,8 @@ func setupDefaults() {
 		"requestPerMinute":   200,
 		"remoteLoggingHost":  "",
 		"logName":            "activations",
-
-		"cache": "", //coresponse to corcache.CacheSystemType
+		"acceptTimeout":      time.Second * 60,
+		"cache":              "", //coresponse to corcache.CacheSystemType
 
 		"cacheSize": uint64(10 * 1024 * 1024), //corosponse to corcache.Local
 

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -32,11 +33,7 @@ func (j *Metrics) AddField(key string, description string) error {
 
 func (j *Metrics) Collect(result map[string]interface{}) {
 	if j.activationLog != nil {
-		//only log if we have an RId as part of the measuremnt
-		if _, ok := result["RId"]; ok {
-			j.activationLog <- result
-		}
-
+		j.activationLog <- result
 	}
 }
 
@@ -147,6 +144,14 @@ func (j *Metrics) Reset() {
 	<-j.sem
 	j.open = false
 	j.activationLog = make(chan map[string]interface{})
+}
+
+func (j *Metrics) Info() string {
+	b := strings.Builder{}
+	for k, v := range j.Fields {
+		b.WriteString(fmt.Sprintf("%s: %s\n", k, v))
+	}
+	return b.String()
 }
 
 //CollectMetrics creates or gets the Metrics Singleton, and starts the activation log writer. Provided fields will be added to the log.

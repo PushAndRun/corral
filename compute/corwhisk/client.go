@@ -1,6 +1,7 @@
 package corwhisk
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -15,6 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/viper"
@@ -34,14 +36,18 @@ type WhiskClient struct {
 
 	remoteLoggingHost string
 
-	address     *string
-	server      net.Listener
-	activations chan io.ReadCloser
+	address         *string
+	server          *net.TCPListener
+	activations     chan io.ReadCloser
+	receiverContext context.Context
+	receiverCancel  context.CancelFunc
 
 	multiDeploymentFeature bool
+	hintingFeature         bool
 	deployments            map[string][]WhiskFunctionConfig
 
 	metrics *api.Metrics
+	sync.Mutex
 }
 
 var propsPath string
@@ -73,6 +79,8 @@ func NewWhiskClient(conf WhiskClientConfig) WhiskClientApi {
 		conf.Context = context.Background()
 	}
 
+	receive, cnl := context.WithCancel(conf.Context)
+
 	var metrics *api.Metrics
 	if conf.WriteMetrics {
 		metrics, err = api.CollectMetrics(map[string]string{
@@ -93,12 +101,57 @@ func NewWhiskClient(conf WhiskClientConfig) WhiskClientApi {
 	return &WhiskClient{
 		Client:                 client,
 		multiDeploymentFeature: conf.MultiDeploymentFeature,
+		hintingFeature:         conf.HintingFeature,
 		spawn:                  limiter,
 		ctx:                    conf.Context,
+		receiverContext:        receive,
+		receiverCancel:         cnl,
 		address:                conf.Address,
 		activations:            make(chan io.ReadCloser),
 		metrics:                metrics,
 		ConcurrencyLimit:       &conf.ConcurrencyLimit,
+	}
+}
+
+//Reset closes all open connections and terminates all Receivers
+func (l *WhiskClient) Reset() error {
+	l.Lock()
+	defer l.Unlock()
+
+	l.receiverCancel()
+	l.server.Close()
+
+	//reset server and receiver context
+	l.server = nil
+	l.receiverContext, l.receiverCancel = context.WithCancel(l.ctx)
+
+	return nil
+}
+
+func (l *WhiskClient) Hint(fname string, payload interface{}, hint *int) (io.ReadCloser, error) {
+	if l.hintingFeature {
+		batch := 1
+		header := make(map[string]interface{})
+		if hint != nil {
+			batch = *hint
+
+		}
+
+		header["X-Corral-Hint"] = batch
+		_, fname, err := l.initInvoke(fname, batch)
+
+		body, err := l.internalInvoke(fname, payload, header, false, true)
+		for i := 0; i < batch; i++ {
+			l.spawn.TryAllow()
+		}
+		//we immediately free up a ticket, we just want to make sure we don't trigger a rate limit
+
+		if err != nil {
+			return nil, err
+		}
+		return body, nil
+	} else {
+		return nil, fmt.Errorf("hinting feature is not enabled")
 	}
 }
 
@@ -108,7 +161,7 @@ func (l *WhiskClient) Invoke(name string, payload interface{}) (io.ReadCloser, e
 
 func (l *WhiskClient) InvokeAsync(name string, payload interface{}) (interface{}, error) {
 
-	start, fname, err := l.initInvoke(name)
+	start, fname, err := l.initInvoke(name, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -132,13 +185,13 @@ func (l *WhiskClient) InvokeAsync(name string, payload interface{}) (interface{}
 
 }
 
-func (l *WhiskClient) initInvoke(baseName string) (int64, string, error) {
+func (l *WhiskClient) initInvoke(baseName string, n int) (int64, string, error) {
 	err := l.startCallBackServer()
 	if err != nil {
 		return -1, "", err
 	}
 
-	err = l.spawn.Wait(l.ctx)
+	err = l.spawn.WaitN(l.ctx, n)
 	if err != nil {
 		return -1, "", err
 	}
@@ -154,7 +207,11 @@ func (l *WhiskClient) initInvoke(baseName string) (int64, string, error) {
 }
 
 func (l *WhiskClient) InvokeAsBatch(name string, payloads []interface{}) ([]interface{}, error) {
-	start, fname, err := l.initInvoke(name)
+	start, fname, err := l.initInvoke(name, len(payloads))
+	if err != nil {
+		log.Debugf("failed to init invoke %s", err)
+		return nil, err
+	}
 
 	preparedPayloads := make([]WhiskPayload, len(payloads))
 	for i, payload := range payloads {
@@ -165,32 +222,67 @@ func (l *WhiskClient) InvokeAsBatch(name string, payloads []interface{}) ([]inte
 		preparedPayloads,
 	}
 
-	actionName := (&url.URL{Path: fname}).String()
-	route := fmt.Sprintf("actions/%s?blocking=%t&result=%t&batch=%t", actionName, false, false, true)
-	request, err := l.Client.NewRequest(http.MethodPost, route, req, true)
-
+	body, err := l.internalInvoke(fname, req, nil, true, false)
 	if err != nil {
 		return nil, err
 	}
 
 	var res map[string]interface{}
-	response, err := l.Client.Do(request, res, false)
+	data, err := ioutil.ReadAll(body)
 	if err != nil {
+		return []interface{}{}, nil
+	}
+	json.Unmarshal(data, &res)
+
+	activations := res["activations"].([]interface{})
+	invocations := make([]interface{}, 0)
+	for _, activation := range activations {
+		if invoke, ok := activation.(map[string]interface{}); ok {
+			if id, ok := invoke["activationId"]; ok {
+				l.startMetricTrace(id, start)
+				invocations = append(invocations, id)
+			}
+		}
+
+	}
+
+	return invocations, nil
+}
+
+func (l *WhiskClient) internalInvoke(fname string, payload interface{}, header map[string]interface{}, batch, hint bool) (io.ReadCloser, error) {
+	if batch && hint {
+		return nil, fmt.Errorf("batch and hint are mutually exclusive")
+	}
+
+	actionName := (&url.URL{Path: fname}).String()
+	route := fmt.Sprintf("actions/%s?blocking=%t&result=%t&batch=%t&hint=%t", actionName, false, false, batch, hint)
+	request, err := l.Client.NewRequest(http.MethodPost, route, payload, true)
+
+	if header != nil {
+		for k, v := range header {
+			request.Header.Set(k, fmt.Sprintf("%+v", v))
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	//TODO: we might have to set v here...
+	response, err := l.Client.Do(request, nil, false)
+	if err != nil {
+		if response != nil {
+			data, _ := ioutil.ReadAll(response.Body)
+			return nil, fmt.Errorf("%+v - %s", err, string(data))
+		}
 		return nil, err
 	}
 
 	if response.StatusCode >= 300 {
-		log.Debugf("failed to batch invoce request...")
-		return nil, fmt.Errorf("failed to batch requests")
+		data, _ := ioutil.ReadAll(response.Body)
+		return nil, fmt.Errorf("%s - %s", response.Status, string(data))
 	}
 
-	activations := res["activations"].([]interface{})
-
-	for _, activation := range activations {
-		l.startMetricTrace(activation, start)
-	}
-
-	return activations, nil
+	return response.Body, nil
 }
 
 func (l *WhiskClient) DeployFunction(conf WhiskFunctionConfig) error {
@@ -361,7 +453,7 @@ func (l *WhiskClient) fetchActivationMetrics(id string) {
 func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCloser, error) {
 	failures := make([]error, 0)
 	for i := 0; i < MaxRetries; i++ {
-		rstart, fname, err := l.initInvoke(name)
+		rstart, fname, err := l.initInvoke(name, 1)
 		invoke, response, err := l.Client.Actions.Invoke(fname, invocation, true, true)
 		rend := time.Now().UnixMilli()
 
@@ -393,8 +485,7 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 			} else if response.StatusCode == 202 {
 				if id, ok := invoke["activationId"]; ok {
 					l.startMetricTrace(invoke["activationId"], rstart)
-					activation, err := l.pollActivation(id.(string))
-					l.spawn.Allow()
+					activation, err := l.PollActivation(id.(string))
 					if err != nil {
 						failures = append(failures, err)
 					} else {
@@ -408,6 +499,8 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 			}
 		} else {
 			log.Warnf("failed [%d/%d]", i, MaxRetries)
+			//give back an token, since we failed, (note this could lead to to much call pressure, if backoff is to short and failiures happend to often)
+			l.spawn.Allow()
 		}
 	}
 
@@ -420,7 +513,7 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 
 }
 
-func (l *WhiskClient) pollActivation(activationID string) (io.ReadCloser, error) {
+func (l *WhiskClient) PollActivation(activationID string) (io.ReadCloser, error) {
 	//might want to configuer the backof rate?
 	backoff := 4
 
@@ -435,12 +528,9 @@ func (l *WhiskClient) pollActivation(activationID string) (io.ReadCloser, error)
 
 	log.Debugf("polling Activation %s", activationID)
 	for x := 0; x < MaxPullRetries; x++ {
-		//err := l.spawn.Wait(l.ctx)
-		//if err != nil {
-		//	return nil, err
-		//}
+
 		invoke, response, err := l.Client.Activations.Get(activationID)
-		//l.spawn.Allow()
+
 		if err != nil || response.StatusCode == 404 {
 			backoff = wait(backoff)
 			if err != nil {
@@ -448,6 +538,7 @@ func (l *WhiskClient) pollActivation(activationID string) (io.ReadCloser, error)
 			}
 		} else if response.StatusCode == 200 {
 			log.Debugf("polled %s successfully", activationID)
+			l.spawn.TryAllow()
 			l.collectInvocation(invoke, time.Now().UnixMilli())
 			marshal, err := json.Marshal(invoke.Result)
 			if err == nil {
@@ -467,20 +558,25 @@ func (l *WhiskClient) collectInvocation(invoke *whisk.Activation, rend int64) {
 			"eStart": invoke.Start,
 			"eEnd":   invoke.End,
 			"eLat":   invoke.End - invoke.Start,
-			"rEnd":   rend,
+			"rRnd":   rend,
 			"dLat":   rend - invoke.End,
 		})
 	}
 }
 
 func (l *WhiskClient) startCallBackServer() error {
+	l.Lock()
+	defer l.Unlock()
 	if l.server != nil {
 		return nil
 	}
 
 	if l.address != nil {
 
-		srv, err := net.Listen("tcp", *l.address)
+		//var lc net.ListenConfig
+		//srv, err := lc.Listen(l.receiverContext, "tcp", *l.address)
+		addr, err := net.ResolveTCPAddr("tcp", *l.address)
+		srv, err := net.ListenTCP("tcp", addr)
 		if err != nil {
 			return err
 		}
@@ -492,72 +588,100 @@ func (l *WhiskClient) startCallBackServer() error {
 	return nil
 }
 
-//ReciveUnitl will copy all io.ReadCloser received until the when function is true or until the client context is closed. In these cases the channal will be closed to singal the end to the consumer.
-func (l *WhiskClient) ReceiveUntil(when func() bool) chan io.ReadCloser {
+//ReceiveUntil will copy all io.ReadCloser received until the when function is true  a timeout is reached.
+//In these cases the channal will be closed to singal the end to the consumer.
+//if the timeout is not set this function will timeout after 15 minutes.
+func (l *WhiskClient) ReceiveUntil(when func() bool, timeout *time.Duration) chan io.ReadCloser {
 	buffer := make(chan io.ReadCloser)
-	go func() {
+	var t time.Duration
+	if timeout != nil {
+		t = *timeout
+	} else {
+		t = time.Minute * 15 //max openwhisk duration
+	}
+
+	go func(timeout time.Duration) {
 		defer close(buffer)
 		for {
 			select {
-			case <-l.ctx.Done():
-				return //canceled
-			case b := <-l.activations:
+			case b, ok := <-l.activations:
+				if !ok {
+					return
+				}
+
 				buffer <- b
 				if when != nil && when() {
 					return
 				}
+			case <-time.After(timeout):
+				return
+			case <-l.receiverContext.Done():
+				return
 			}
 		}
-
-	}()
+	}(t)
 
 	return buffer
 }
 
-func (l *WhiskClient) Close() error {
-	if l.server != nil {
-		err := l.server.Close()
-		l.server = nil
-		return err
+func (l *WhiskClient) accept() {
+	if l.server == nil {
+		return
 	}
-
-	return nil
+	for {
+		conn, err := l.server.AcceptTCP()
+		if err != nil {
+			select {
+			case <-l.ctx.Done():
+				return
+			case <-l.receiverContext.Done():
+				return
+			default:
+				log.Debugf("server failed to accept %+v", err)
+			}
+		} else {
+			go l.handleConnection(conn)
+			log.Debugf("new connection %+v", conn.RemoteAddr())
+		}
+	}
 }
 
-func (l *WhiskClient) accept() {
+func (l *WhiskClient) handleConnection(conn *net.TCPConn) {
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+
+	_ = conn.SetReadBuffer(1024 * 64)
+	_ = conn.SetNoDelay(true)
+	_ = conn.SetKeepAlive(true)
+	_ = conn.SetReadDeadline(time.Now().Add(viper.GetDuration("acceptTimeout")))
+
+	scanner := bufio.NewScanner(conn)
+
 	for {
 		select {
 		case <-l.ctx.Done():
+			log.Debugf("client context closed, closing connection %+v", conn.RemoteAddr())
+			return
+		case <-l.receiverContext.Done():
+			log.Debugf("receiver context closed, closing connection %+v", conn.RemoteAddr())
 			return
 		default:
-			if l.server == nil {
-				log.Debugf("accept failed server is closed")
+			if scanner.Scan() {
+				buf := new(bytes.Buffer)
+				buf.Write(scanner.Bytes())
+				_ = conn.SetReadDeadline(time.Now().Add(viper.GetDuration("acceptTimeout")))
+				l.activations <- io.NopCloser(buf)
+				l.spawn.TryAllow()
+			} else {
+				if scanner.Err() != nil {
+					log.Debugf("failed to read from connection - %+v", scanner.Err())
+				} else {
+					log.Debugf("Connectionhandler closed EOF")
+				}
 				return
 			}
-
-			conn, err := l.server.Accept()
-			if err != nil {
-				log.Debugf("accept failed %+v", err)
-				if err == net.ErrClosed {
-					return
-				}
-			}
-
-			go func(conn net.Conn, activations chan io.ReadCloser) {
-				if conn == nil {
-					return
-				}
-				data, err := ioutil.ReadAll(conn)
-				conn.Close()
-				l.spawn.Allow()
-
-				if err != nil {
-					log.Debug("failed to read from connection")
-				}
-				log.Debug("got activation callback")
-				activations <- io.NopCloser(bytes.NewBuffer(data))
-
-			}(conn, l.activations)
 		}
 	}
 }

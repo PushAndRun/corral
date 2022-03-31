@@ -10,8 +10,6 @@ var flags = []string{
 	//orchestration
 	//ready
 	"callback", //uses a function callback feature to collect invocation results
-	//todo
-	"proactive", //proactively send activation based on prior observations
 	//ready
 	"eventBatching", //batching events
 
