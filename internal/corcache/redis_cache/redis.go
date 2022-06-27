@@ -4,6 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ISE-SMILE/corral/api"
 	"github.com/ISE-SMILE/corral/services"
 	"github.com/apache/openwhisk-client-go/whisk"
@@ -11,10 +17,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"io"
-	"os"
-	"strconv"
-	"strings"
 )
 
 type RedisBackedCache struct {
@@ -27,12 +29,16 @@ type RedisBackedCache struct {
 
 func asOptions(rc *services.RedisClientConfig) *redis.UniversalOptions {
 	return &redis.UniversalOptions{
-		Addrs:          rc.Addrs,
-		DB:             int(rc.DB),
-		Username:       rc.User,
-		Password:       rc.Password,
-		RouteByLatency: rc.RouteByLatency,
-		RouteRandomly:  rc.RouteRandomly,
+		Addrs:           rc.Addrs,
+		DB:              int(rc.DB),
+		Username:        rc.User,
+		Password:        rc.Password,
+		RouteByLatency:  rc.RouteByLatency,
+		RouteRandomly:   rc.RouteRandomly,
+		MaxRetries:      5,
+		MinRetryBackoff: 10 * time.Second,
+		ReadTimeout:     time.Second * 2,
+		WriteTimeout:    time.Second * 5,
 	}
 }
 
@@ -71,7 +77,11 @@ func (r *RedisBackedCache) Init() error {
 				conf.Addrs = []string{addrs}
 			}
 		} else {
-			return fail("REDIS_ADDRS")
+			if viper.GetString("redis_address") != "" {
+				conf.Addrs = []string{viper.GetString("redis_address")}
+			} else {
+				return fail("REDIS_ADDRS")
+			}
 		}
 
 		db := os.Getenv("REDIS_DB")
@@ -82,14 +92,22 @@ func (r *RedisBackedCache) Init() error {
 			}
 			conf.DB = int32(dbp)
 		} else {
-			return fail("REDIS_DB")
+			if viper.GetString("redis_db") != "" {
+				conf.DB = viper.GetInt32("redis_db")
+			} else {
+				return fail("REDIS_DB")
+			}
 		}
 
 		user := os.Getenv("REDIS_USER")
 		if user != "" {
 			conf.User = user
 		} else {
-			return fail("REDIS_USER")
+			if viper.GetString("redis_user") != "" {
+				conf.User = viper.GetString("redis_user")
+			} else {
+				conf.User = ""
+			}
 		}
 
 		//TODO: XXXX this is not a good practice, we could compile this in code and fail in local settings, but for now it is what it is...
@@ -97,7 +115,12 @@ func (r *RedisBackedCache) Init() error {
 		if user != "" {
 			conf.Password = secret
 		} else {
-			return fail("REDIS_SECRET")
+			if viper.GetString("redis_password") != "" {
+				conf.Password = viper.GetString("redis_password")
+			} else {
+				conf.Password = ""
+			}
+
 		}
 
 		var mode int = 0
@@ -117,6 +140,7 @@ func (r *RedisBackedCache) Init() error {
 	r.Client = redis.NewUniversalClient(asOptions(r.Config))
 
 	_, err := r.Client.Ping(context.Background()).Result()
+	log.Debug("connected to redis")
 	return err
 }
 
@@ -167,7 +191,9 @@ func (b *bufferedRedisReader) Close() error {
 }
 
 func (r *RedisBackedCache) OpenReader(filePath string, startAt int64) (io.ReadCloser, error) {
+	t := time.Now()
 	buf, err := r.Client.Get(context.Background(), filePath).Bytes()
+	api.TryCount("CRT", time.Since(t))
 	if err != nil {
 		return nil, err
 	} else {
@@ -189,9 +215,12 @@ type bufferedRedisWriter struct {
 }
 
 func (b *bufferedRedisWriter) Close() error {
+	//TODO: we might want to modify this to write the buffer based on a threshold to storage instead of all at once
+	t := time.Now()
 	bytes := b.Bytes()
-	msg, err := b.client.Set(context.Background(), b.key, bytes, 0).Result()
-	log.Debug(msg)
+	_, err := b.client.Set(context.Background(), b.key, bytes, 0).Result()
+	api.TryCount("CWT", time.Since(t))
+	b.Buffer.Reset()
 	return err
 }
 
@@ -288,6 +317,9 @@ func (r *RedisBackedCache) Clear() error {
 }
 
 func (r *RedisBackedCache) plugin_ensure() error {
+	if r.deploymentType == "prebaked" {
+		return nil
+	}
 
 	if !r.Plugin.IsReady() {
 		err := r.Plugin.Init()
@@ -311,6 +343,10 @@ func (r *RedisBackedCache) plugin_ensure() error {
 }
 
 func (r *RedisBackedCache) Deploy() error {
+	if r.deploymentType == "prebaked" {
+		return nil
+	}
+
 	err := r.plugin_ensure()
 	if err != nil {
 		return err
@@ -337,6 +373,11 @@ func (r *RedisBackedCache) Deploy() error {
 
 func (r *RedisBackedCache) Undeploy() error {
 	r.Client.Close()
+
+	if r.deploymentType == "prebaked" {
+		return nil
+	}
+
 	err := r.plugin_ensure()
 	if err != nil {
 		return err
@@ -370,26 +411,26 @@ func (r *RedisCacheConfigInjector) ConfigureWhisk(action *whisk.Action) error {
 	}
 
 	if r.system.Config == nil {
-		return fmt.Errorf("Cache Config not availible")
+		return fmt.Errorf("cache config not availible")
 	}
 
 	addrs := strings.Join(r.system.Config.Addrs, ";")
-	action.Parameters.AddOrReplace(&whisk.KeyValue{
+	action.Parameters = action.Parameters.AddOrReplace(&whisk.KeyValue{
 		Key:   "REDIS_ADDRS",
 		Value: addrs,
 	})
 
-	action.Parameters.AddOrReplace(&whisk.KeyValue{
+	action.Parameters = action.Parameters.AddOrReplace(&whisk.KeyValue{
 		Key:   "REDIS_DB",
 		Value: r.system.Config.DB,
 	})
 
-	action.Parameters.AddOrReplace(&whisk.KeyValue{
+	action.Parameters = action.Parameters.AddOrReplace(&whisk.KeyValue{
 		Key:   "REDIS_USER",
 		Value: r.system.Config.User,
 	})
 
-	action.Parameters.AddOrReplace(&whisk.KeyValue{
+	action.Parameters = action.Parameters.AddOrReplace(&whisk.KeyValue{
 		Key:   "REDIS_SECRET",
 		Value: &r.system.Config.Password,
 	})

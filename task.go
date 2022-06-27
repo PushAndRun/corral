@@ -44,4 +44,9 @@ type taskResult struct {
 	CStart int64  `json:"cStart"` //start of runtime
 	EStart int64  `json:"eStart"` //start of request
 	EEnd   int64  `json:"eEnd"`   //end of request
+
+	CWT int64 `json:"CWT"` //Cache WriteTime
+	CRT int64 `json:"CRT"` //Cache ReadTime
+	SWT int64 `json:"SWT"` //S3 WriteTime
+	SRT int64 `json:"SRT"` //S3 ReadTime
 }

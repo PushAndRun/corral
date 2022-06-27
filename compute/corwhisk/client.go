@@ -7,8 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/ISE-SMILE/corral/api"
-	"github.com/ISE-SMILE/corral/compute/build"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -19,13 +17,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ISE-SMILE/corral/api"
+	"github.com/ISE-SMILE/corral/compute/build"
+
 	"github.com/spf13/viper"
 
 	"github.com/apache/openwhisk-client-go/whisk"
 	log "github.com/sirupsen/logrus"
 )
 
-const MaxPullRetries = 4
+const MaxPullRetries = 3
 
 type WhiskClient struct {
 	Client           *whisk.Client
@@ -84,9 +85,11 @@ func NewWhiskClient(conf WhiskClientConfig) WhiskClientApi {
 	var metrics *api.Metrics
 	if conf.WriteMetrics {
 		metrics, err = api.CollectMetrics(map[string]string{
-			"RId":   "request id",
-			"start": "request submitted",
-			"end":   "request completed",
+			"RId":    "request id",
+			"eLat":   "execution latecncy",
+			"rEnd":   "request completed",
+			"rStart": "request submitted",
+			"dLat":   "delivery latency",
 		})
 		if err != nil {
 			log.Error("could not init metrics", err)
@@ -110,6 +113,7 @@ func NewWhiskClient(conf WhiskClientConfig) WhiskClientApi {
 		activations:            make(chan io.ReadCloser),
 		metrics:                metrics,
 		ConcurrencyLimit:       &conf.ConcurrencyLimit,
+		remoteLoggingHost:      conf.RemoteLoggingHost,
 	}
 }
 
@@ -226,6 +230,7 @@ func (l *WhiskClient) InvokeAsBatch(name string, payloads []interface{}) ([]inte
 	if err != nil {
 		return nil, err
 	}
+	log.Debugf("invoked batch at %s", name)
 
 	var res map[string]interface{}
 	data, err := ioutil.ReadAll(body)
@@ -235,6 +240,7 @@ func (l *WhiskClient) InvokeAsBatch(name string, payloads []interface{}) ([]inte
 	json.Unmarshal(data, &res)
 
 	activations := res["activations"].([]interface{})
+	log.Debugf("got %d activations for %d invocations", len(activations), len(payloads))
 	invocations := make([]interface{}, 0)
 	for _, activation := range activations {
 		if invoke, ok := activation.(map[string]interface{}); ok {
@@ -288,6 +294,7 @@ func (l *WhiskClient) internalInvoke(fname string, payload interface{}, header m
 func (l *WhiskClient) DeployFunction(conf WhiskFunctionConfig) error {
 	buildPackage, codeHashDigest, err := build.BuildPackage("exec")
 	if err != nil {
+		log.Debugf("failed to build package %+v", err)
 		return err
 	}
 
@@ -323,7 +330,7 @@ func (l *WhiskClient) DeployFunction(conf WhiskFunctionConfig) error {
 }
 
 func (l *WhiskClient) deployFunction(conf WhiskFunctionConfig, buildPackage []byte, codeHashDigest string) error {
-
+	log.Debugf("deploying function %s - %+v", conf.FunctionName, conf)
 	actionName, namespace := GetQualifiedName(conf.FunctionName)
 
 	if conf.Memory == 0 {
@@ -354,10 +361,9 @@ func (l *WhiskClient) deployFunction(conf WhiskFunctionConfig, buildPackage []by
 	action.Namespace = namespace
 
 	action.Limits = &whisk.Limits{
-		Timeout:     &conf.Timeout,
-		Memory:      &conf.Memory,
-		Logsize:     nil,
-		Concurrency: l.ConcurrencyLimit,
+		Timeout: &conf.Timeout,
+		Memory:  &conf.Memory,
+		Logsize: nil,
 	}
 
 	var binary = true
@@ -377,13 +383,16 @@ func (l *WhiskClient) deployFunction(conf WhiskFunctionConfig, buildPackage []by
 
 	action.Annotations = action.Annotations.AddOrReplace(&hashAnnotation)
 
-	addressAnnotation := whisk.KeyValue{
-		Key:   "address",
-		Value: viper.GetString("address"),
+	if l.address != nil {
+		addressAnnotation := whisk.KeyValue{
+			Key:   "address",
+			Value: *l.address,
+		}
+		action.Annotations = action.Annotations.AddOrReplace(&addressAnnotation)
 	}
-	action.Annotations = action.Annotations.AddOrReplace(&addressAnnotation)
 
 	if conf.CacheConfigInjector != nil {
+		log.Debug("injecting cache config")
 		if wi, ok := conf.CacheConfigInjector.(WhiskCacheConfigInjector); ok {
 			err := wi.ConfigureWhisk(action)
 			if err != nil {
@@ -440,7 +449,6 @@ func (l *WhiskClient) fetchActivationMetrics(id string) {
 	if l.metrics != nil {
 		invoke, _, err := l.Client.Activations.Get(id)
 		if err != nil {
-			log.Debugf("Failed to fetch activation metrics for %s", id)
 			return
 		}
 
@@ -456,7 +464,7 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 		rstart, fname, err := l.initInvoke(name, 1)
 		invoke, response, err := l.Client.Actions.Invoke(fname, invocation, true, true)
 		rend := time.Now().UnixMilli()
-
+		log.Debugf("invoke %s took %d ms", fname, rend-rstart)
 		if response == nil && err != nil {
 			failures = append(failures, err)
 			log.Warnf("failed [%d/%d]", i, MaxRetries)
@@ -465,8 +473,7 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 		}
 
 		if response != nil {
-			log.Debugf("invoked %s - %d", fname, response.StatusCode)
-			log.Debugf("%+v", invoke)
+			log.Debugf("%d - %+v", response.StatusCode, invoke)
 			if response.StatusCode == 200 {
 				if l.metrics != nil {
 					rid := response.Header.Get("X-Openwhisk-Activation-ID")
@@ -480,7 +487,7 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 						go l.fetchActivationMetrics(rid)
 					}
 				}
-				l.spawn.Allow()
+				l.spawn.TryAllow()
 				return response.Body, nil
 			} else if response.StatusCode == 202 {
 				if id, ok := invoke["activationId"]; ok {
@@ -488,6 +495,7 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 					activation, err := l.PollActivation(id.(string))
 					if err != nil {
 						failures = append(failures, err)
+						l.spawn.TryAllow()
 					} else {
 						return activation, nil
 					}
@@ -558,7 +566,7 @@ func (l *WhiskClient) collectInvocation(invoke *whisk.Activation, rend int64) {
 			"eStart": invoke.Start,
 			"eEnd":   invoke.End,
 			"eLat":   invoke.End - invoke.Start,
-			"rRnd":   rend,
+			"rEnd":   rend,
 			"dLat":   rend - invoke.End,
 		})
 	}

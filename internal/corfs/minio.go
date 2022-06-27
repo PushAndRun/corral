@@ -3,12 +3,15 @@ package corfs
 import (
 	"errors"
 	"fmt"
-	"github.com/ISE-SMILE/corral/api"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/ISE-SMILE/corral/api"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	log "github.com/sirupsen/logrus"
@@ -78,12 +81,14 @@ func (s *MinioFileSystem) ListFiles(pathGlob string) ([]api.FileInfo, error) {
 				if !(dirMatch || pathMatch) {
 					continue
 				}
-
-				s3Files = append(s3Files, api.FileInfo{
-					Name: fullPath,
-					Size: *object.Size,
-				})
-				s.objectCache.Add(fullPath, object)
+				//skip empty files...
+				if *object.Size > 0 {
+					s3Files = append(s3Files, api.FileInfo{
+						Name: fullPath,
+						Size: *object.Size,
+					})
+					s.objectCache.Add(fullPath, object)
+				}
 			}
 			return true
 		})
@@ -109,7 +114,7 @@ func (s *MinioFileSystem) OpenReader(filePath string, startAt int64) (io.ReadClo
 		bucket:    parsed.Hostname(),
 		key:       parsed.Path,
 		offset:    startAt,
-		chunkSize: 20 * 1024 * 1024, // 20 Mb chunk size
+		chunkSize: 32 * 1024 * 1024, // 20 Mb chunk size
 		totalSize: objStat.Size,
 	}
 	err = reader.loadNextChunk()
@@ -180,11 +185,15 @@ func (s *MinioFileSystem) Init() error {
 	} else if host := os.Getenv("__OW_MINIO_HOST"); host != "" {
 		endpoint = host
 	} else if endpoint == "" {
+		endpoint = viper.GetString("driverMinioHost")
+	} else if endpoint == "" {
 		endpoint = viper.GetString("minioHost")
 	} else if endpoint == "" {
 		log.Error("could not minio determine endpoint")
 		return fmt.Errorf("MINIO_ENDPOINT not set in env %+v", os.Environ())
 	}
+
+	log.Debugf("using %s as minio endpoint", endpoint)
 
 	// Configure to use MinIO Server
 	s3Config := &aws.Config{
@@ -208,6 +217,10 @@ func (s *MinioFileSystem) Init() error {
 		Region:           aws.String("us-east-1"),
 		DisableSSL:       aws.Bool(true),
 		S3ForcePathStyle: aws.Bool(true),
+		MaxRetries:       aws.Int(3),
+		HTTPClient: &http.Client{
+			Timeout: time.Second * 15,
+		},
 	}
 
 	if log.IsLevelEnabled(log.DebugLevel) {

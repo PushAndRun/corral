@@ -1,6 +1,7 @@
 package corral
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/spf13/viper"
 	"io/ioutil"
@@ -76,4 +77,18 @@ func TestJob_CollectMetrics(t *testing.T) {
 	}
 	fmt.Println(string(file))
 
+}
+
+func TestGenerateRequest(t *testing.T) {
+	tx := task{JobNumber: 0, Phase: 0, BinID: 11, IntermediateBins: 92, FileSystemType: 2, CacheSystemType: 0, WorkingLocation: "minio://tpch/output", Cleanup: false,
+		Splits: []InputSplit{
+			{Filename: "minio://tpch/10/lineitem/lineitem.tbl_ac", StartOffset: 83886080, EndOffset: 94371839},
+			{Filename: "minio://tpch/10/lineitem/lineitem.tbl_ac", StartOffset: 94371840, EndOffset: 104857599},
+			{Filename: "minio://tpch/10/lineitem/lineitem.tbl_ac", StartOffset: 104857600, EndOffset: 115343359},
+			{Filename: "minio://tpch/10/lineitem/lineitem.tbl_ac", StartOffset: 115343360, EndOffset: 125829119},
+			{Filename: "minio://tpch/10/lineitem/lineitem.tbl_ac", StartOffset: 125829120, EndOffset: 136314879},
+		},
+	}
+	d, _ := json.Marshal(tx)
+	fmt.Printf(string(d))
 }

@@ -7,9 +7,14 @@ import (
 	"time"
 )
 
+type SetValue struct {
+	InsertionTime int64
+	Data interface{}
+}
+
 type ActivationSet struct {
 	//internal data structure
-	m map[string]int64
+	m map[string]SetValue
 	//flag to indicate this set is now immutable
 	closed bool
 	//mutex to wait on empty set
@@ -20,29 +25,36 @@ type ActivationSet struct {
 
 func NewSet() *ActivationSet {
 	m := &ActivationSet{
-		m: make(map[string]int64),
+		m: make(map[string]SetValue),
 	}
 	m.notEmpty = sync.NewCond(&m.RWMutex)
 	return m
 }
 
 // Add add
-func (s *ActivationSet) Add(activationID string) error {
+func (s *ActivationSet) AddWithData(activationID string,data interface{}) error {
 	s.Lock()
 	defer s.Unlock()
 	if s.closed {
 		return fmt.Errorf(" cannot add to a closed set")
 	}
-	s.m[activationID] = time.Now().UnixMilli()
+	s.m[activationID] = SetValue{time.Now().UnixMilli(),data}
 	s.notEmpty.Signal()
 	return nil
 }
 
+// Add add
+func (s *ActivationSet) Add(activationID string) error {
+	return s.AddWithData(activationID,nil)
+}
+
 // Remove deletes the specified item from the map
-func (s *ActivationSet) Remove(activationID string) {
+func (s *ActivationSet) Remove(activationID string) interface{} {
 	s.Lock()
 	defer s.Unlock()
+	data := s.m[activationID].Data
 	delete(s.m, activationID)
+	return data
 }
 
 // Has looks for the existence of an item
@@ -80,7 +92,7 @@ func (s *ActivationSet) Len() int {
 func (s *ActivationSet) Clear() {
 	s.Lock()
 	defer s.Unlock()
-	s.m = make(map[string]int64)
+	s.m = make(map[string]SetValue)
 
 }
 
@@ -95,12 +107,9 @@ func (s *ActivationSet) IsEmpty() bool {
 func (s *ActivationSet) List() []string {
 	s.RLock()
 	defer s.RUnlock()
-	list := make([]string, 0)
-	for k, _ := range s.m {
-		list = append(list, k)
-	}
-	return list
+	return frozenSortedSet(s.m)
 }
+
 
 func (s *ActivationSet) AddAll(new []string) error {
 	for i, v := range new {
@@ -150,7 +159,23 @@ func (s *ActivationSet) Take(num int) []string {
 	return list
 }
 
-func frozenSortedSet(m map[string]int64) []string {
+//Gets at most the Top n values
+func (s *ActivationSet) Top(num int) []string {
+	s.RLock()
+	defer s.RUnlock()
+	if len(s.m) > 0 {
+		set := frozenSortedSet(s.m)
+
+		if len(set) < num {
+			return set
+		} else {
+			return set[:num]
+		}
+	}
+
+	return []string{}
+}
+func frozenSortedSet(m map[string]SetValue) []string {
 	type pair struct {
 		key   string
 		value int64
@@ -159,7 +184,7 @@ func frozenSortedSet(m map[string]int64) []string {
 	list := make([]pair, 0)
 
 	for k, v := range m {
-		list = append(list, pair{k, v})
+		list = append(list, pair{k, v.InsertionTime})
 	}
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].value < list[j].value

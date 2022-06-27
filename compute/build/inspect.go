@@ -3,26 +3,29 @@ package build
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	log "github.com/sirupsen/logrus"
-	"golang.org/x/mod/modfile"
-	"golang.org/x/mod/module"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 )
 
 func CodeHash(root string) (string, error) {
 	path, err := filepath.Abs(root)
-	log.Infof("code hash %s", path)
+	log.Infof("generating code hash %s", path)
 	codeHash := sha256.New()
 
 	data, err := ioutil.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
+		log.Debugf("could not read go.mod %s", err)
 		return "", err
 	}
 
 	f, err := modfile.ParseLax(filepath.Join(root, "go.mod"), data, nil)
 	if err != nil {
+		log.Debugf("could parse read go.mod %s", err)
 		return "", err
 	}
 

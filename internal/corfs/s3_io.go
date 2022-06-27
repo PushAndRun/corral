@@ -3,10 +3,15 @@ package corfs
 import (
 	"fmt"
 	"io"
+	"runtime"
+	"time"
 
+	"github.com/ISE-SMILE/corral/api"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/mattetti/filebuffer"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type s3Writer struct {
@@ -19,6 +24,15 @@ type s3Writer struct {
 	complatedParts  []*s3.CompletedPart
 }
 
+func wrapError(err error, str string) error {
+	if err != nil {
+		log.Debugf("%s - %+v", str, err)
+		return fmt.Errorf("%s - %+v", str, err)
+	} else {
+		return nil
+	}
+}
+
 func (s *s3Writer) Init() error {
 	params := &s3.CreateMultipartUploadInput{
 		Bucket: aws.String(s.bucket),
@@ -29,7 +43,7 @@ func (s *s3Writer) Init() error {
 	if result != nil {
 		s.uploadID = *result.UploadId
 	}
-	return err
+	return wrapError(err, "WriterInit")
 }
 
 func (s *s3Writer) uploadChunk() error {
@@ -43,7 +57,9 @@ func (s *s3Writer) uploadChunk() error {
 		Body:       s.buf,
 		PartNumber: aws.Int64(partNumber),
 	}
+	t := time.Now()
 	result, err := s.client.UploadPart(uploadParams)
+	api.TryCount("SWT", time.Since(t))
 	if result != nil {
 		s.complatedParts = append(s.complatedParts, &s3.CompletedPart{
 			ETag:       result.ETag,
@@ -54,7 +70,7 @@ func (s *s3Writer) uploadChunk() error {
 	// Reset buffer
 	s.buf = filebuffer.New(nil)
 
-	return err
+	return wrapError(err, "WriterUpload")
 }
 
 func (s *s3Writer) Write(p []byte) (n int, err error) {
@@ -62,7 +78,7 @@ func (s *s3Writer) Write(p []byte) (n int, err error) {
 	if int64(len(s.buf.Bytes())) > s.uploadChunkSize {
 		err = s.uploadChunk()
 	}
-	return n, err
+	return n, wrapError(err, "WriterWrite")
 }
 
 func (s *s3Writer) Close() error {
@@ -79,7 +95,7 @@ func (s *s3Writer) Close() error {
 
 	_, err = s.client.CompleteMultipartUpload(completeParams)
 
-	return err
+	return wrapError(err, "WriterClose")
 }
 
 type s3Reader struct {
@@ -102,18 +118,22 @@ func (s *s3Reader) loadNextChunk() error {
 	s.offset += size
 	output, err := s.client.GetObject(params)
 	s.chunk = output.Body
-	return err
+	return wrapError(err, "ReaderLoadChunk")
 }
 
 func (s *s3Reader) Read(b []byte) (n int, err error) {
+	t := time.Now()
 	n, err = s.chunk.Read(b)
 	if err == io.EOF && s.offset != s.totalSize {
 		s.chunk.Close()
 		err = s.loadNextChunk()
+		runtime.GC()
 	}
-	return n, err
+	api.TryCount("SRT", time.Since(t))
+	return n, wrapError(err, "ReaderRead")
 }
 
 func (s *s3Reader) Close() error {
-	return s.chunk.Close()
+
+	return wrapError(s.chunk.Close(), "ReaderClose")
 }

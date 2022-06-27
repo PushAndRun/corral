@@ -4,16 +4,61 @@ import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 var metricCollector *Metrics
+var counter *Counter = &Counter{Counter: map[string]time.Duration{}}
+
+func TryCollect(result map[string]interface{}) {
+	if metricCollector != nil {
+		metricCollector.Collect(result)
+	}
+}
+
+func TryCount(key string, val time.Duration) {
+	if counter != nil {
+		counter.Count(key, val)
+	}
+}
+
+func TryGetCount(key string) int {
+	if counter != nil {
+		return counter.GetAndReset(key)
+	}
+	return 0
+}
+
+type Counter struct {
+	Counter map[string]time.Duration
+	sync.Mutex
+}
+
+func (j *Counter) Count(key string, val time.Duration) {
+	j.Mutex.Lock()
+	if _, ok := j.Counter[key]; !ok {
+		j.Counter[key] = val
+	} else {
+		j.Counter[key] += val
+	}
+	j.Mutex.Unlock()
+}
+
+func (j *Counter) GetAndReset(key string) int {
+	j.Mutex.Lock()
+	v := j.Counter[key]
+	j.Counter[key] = 0
+	j.Mutex.Unlock()
+	return int(v.Round(time.Millisecond))
+}
 
 type Metrics struct {
 	Fields map[string]string
@@ -32,9 +77,11 @@ func (j *Metrics) AddField(key string, description string) error {
 }
 
 func (j *Metrics) Collect(result map[string]interface{}) {
+	//inject counter valaues
 	if j.activationLog != nil {
 		j.activationLog <- result
 	}
+
 }
 
 func (j *Metrics) writeActivationLog() {

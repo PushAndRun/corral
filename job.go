@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
+
 	"github.com/ISE-SMILE/corral/api"
 	humanize "github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
-	"strings"
-	"sync"
-	"sync/atomic"
 )
 
 // Job is the logical container for a MapReduce job
@@ -58,7 +59,7 @@ func (j *Job) runMapper(mapperID uint, splits []InputSplit) error {
 	for _, split := range splits {
 		err := j.runMapperSplit(split, &emitter)
 		if err != nil {
-			return err
+			return fmt.Errorf("split error +%v", err)
 		}
 	}
 
@@ -89,7 +90,7 @@ func (j *Job) runMapperSplit(split InputSplit, emitter Emitter) error {
 
 	inputSource, err := j.fileSystem.OpenReader(split.Filename, split.StartOffset)
 	if err != nil {
-		return err
+		return fmt.Errorf("read error +%v", err)
 	}
 
 	scanner := bufio.NewScanner(inputSource)
@@ -243,7 +244,7 @@ func (j *Job) inputSplits(inputs []string, maxSplitSize int64) []InputSplit {
 		totalSize += fInfo.Size
 		splits = append(splits, splitInputFile(fInfo, maxSplitSize)...)
 	}
-	if len(files) > 0 {
+	if len(files) > 0 && len(splits) > 0 {
 		log.Debugf("Average split size: %s bytes", humanize.Bytes(uint64(totalSize)/uint64(len(splits))))
 	}
 
@@ -273,6 +274,10 @@ func (j *Job) CollectMetrics() {
 		"eEnd":         "execution end",
 		"BytesRead":    "request received",
 		"BytesWritten": "delivery latency",
+		"ObjectWrite":  "ms spent writing to object store",
+		"ObjectRead":   "ms spent reading from object store",
+		"CacheWrite":   "ms spent writing to cache",
+		"CacheRead":    "ms spent reading from cache",
 	})
 
 	if err != nil {
@@ -295,6 +300,10 @@ func (j *Job) Collect(result taskResult) {
 			"eEnd":         result.EEnd,
 			"BytesRead":    result.BytesRead,
 			"BytesWritten": result.BytesWritten,
+			"ObjectWrite":  result.SWT,
+			"ObjectRead":   result.SRT,
+			"CacheWrite":   result.CWT,
+			"CacheRead":    result.CRT,
 		})
 	}
 }

@@ -31,9 +31,10 @@ func setupDefaults() {
 		"lambdaRoleARN":      "", // added for compleatness is used in conjunction with lambdaManageRole
 		"lambdaS3Key":        "",
 		"lambdaS3Bucket":     "",
-		"cleanup":            true,
+		"cleanup":            true,  //if intermediate data should be deleted after use
 		"durable":            false, //Should Intermeidiate data be flushed to the filesystem (in conflict with cleanup)
 		"verbose":            false,
+		"veryverbose":        false,
 		"splitSize":          100 * 1024 * 1024, // Default input split size is 100Mb
 		"mapBinSize":         512 * 1024 * 1024, // Default map bin size is 512Mb
 		"reduceBinSize":      512 * 1024 * 1024, // Default reduce bin size is 512Mb

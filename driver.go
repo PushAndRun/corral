@@ -3,10 +3,8 @@ package corral
 import (
 	"context"
 	"fmt"
-	"github.com/ISE-SMILE/corral/api"
-	"github.com/ISE-SMILE/corral/internal/corcache"
-	"github.com/ISE-SMILE/corral/internal/corfs"
 	"io"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -15,6 +13,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ISE-SMILE/corral/api"
+	"github.com/ISE-SMILE/corral/internal/corcache"
+	"github.com/ISE-SMILE/corral/internal/corfs"
 
 	"github.com/dustin/go-humanize"
 
@@ -162,6 +164,16 @@ func WithReduceBinSize(s int64) Option {
 	}
 }
 
+func WithMultipleSize(mul float64) Option {
+	return func(c *config) {
+		c.ReduceBinSize = int64(math.Ceil(float64(c.ReduceBinSize) * mul))
+		c.MapBinSize = int64(math.Ceil(float64(c.MapBinSize) * mul))
+		c.SplitSize = int64(math.Ceil(float64(c.SplitSize) * mul))
+
+		log.Debugf("using size reduce:%dMB map:%dMB split:%dMB", c.ReduceBinSize/1024/1024, c.MapBinSize/1024/1024, c.SplitSize/1024/1024)
+	}
+}
+
 // WithWorkingLocation sets the location and filesystem backend of the Driver
 func WithWorkingLocation(location string) Option {
 	return func(c *config) {
@@ -281,9 +293,13 @@ func (d *Driver) runMapPhase(job *Job, jobNumber int, inputs []string) {
 
 	if viper.GetBool("eventBatching") {
 		sem := d.executor.(smileExecutor)
-		err := sem.BatchRunMapper(job, jobNumber, inputBins)
-		if err != nil {
-			log.Errorf("Error when running batch mapper %s", err)
+		for i := 0; i < 3; i++ {
+			err := sem.BatchRunMapper(job, jobNumber, inputBins)
+			if err != nil {
+				log.Errorf("Error when running batch mapper %s", err)
+			} else {
+				break
+			}
 		}
 
 	} else {
@@ -326,9 +342,13 @@ func (d *Driver) runReducePhase(job *Job, jobNumber int) {
 		for i := 0; i < len(bins); i++ {
 			bins[i] = uint(i)
 		}
-		err := sem.BatchRunReducer(job, jobNumber, bins)
-		if err != nil {
-			log.Errorf("Error when running batch mapper %s", err)
+		for i := 0; i < 3; i++ {
+			err := sem.BatchRunReducer(job, jobNumber, bins)
+			if err != nil {
+				log.Errorf("Error when running batch mapper %s", err)
+			} else {
+				break
+			}
 		}
 	} else {
 		for binID := uint(0); binID < job.intermediateBins; binID++ {
@@ -371,19 +391,11 @@ func (d *Driver) runOnCloudPlatfrom() bool {
 func (d *Driver) run() {
 	if d.runOnCloudPlatfrom() {
 		log.Warn("Running on FaaS runtime and Returned, this is bad!")
+		fmt.Println("Function Loop Termintated!")
 		os.Exit(-10)
 	}
 	if !validateFlagConfig(d) {
 		panic(fmt.Errorf("failed to validate flags, can't execute"))
-	}
-
-	//TODO: do preflight checks e.g. check if in/out is accassible...
-	//TODO introduce interface for deploy/undeploy
-	if lBackend, ok := d.executor.(platform); ok {
-		err := lBackend.Deploy(d)
-		if err != nil {
-			panic(err)
-		}
 	}
 
 	if d.cache != nil {
@@ -402,6 +414,15 @@ func (d *Driver) run() {
 		if err != nil {
 			log.Errorf("failed to initilized cache, %+v", err)
 			return
+		}
+	}
+
+	//TODO: do preflight checks e.g. check if in/out is accessible...
+	//TODO introduce interface for deploy/undeploy
+	if lBackend, ok := d.executor.(platform); ok {
+		err := lBackend.Deploy(d)
+		if err != nil {
+			panic(err)
 		}
 	}
 
@@ -506,11 +527,10 @@ var undeploy = flag.Bool("undeploy", false, "Undeploy the Lambda function and IA
 // Main starts the Driver, running the submitted jobs.
 func (d *Driver) Main() {
 	defer api.StopAllRunningPlugins()
-	//log.SetLevel(log.DebugLevel)
+
 	if viper.GetBool("verbose") || *verbose {
 		log.SetLevel(log.DebugLevel)
 	}
-
 	if *undeploy {
 		//TODO: this is a shitty interface/abstraction
 		err := d.Undeploy(backendFlag)
@@ -543,7 +563,8 @@ func (d *Driver) Main() {
 }
 
 func (d *Driver) Execute() {
-	log.Info("Mode [%s]", CompileFlagName())
+	log.Debugf("Using Config %+v", viper.AllSettings())
+	log.Debugf("Mode [%s] - %s", CompileFlagName(), d.config.Backend)
 	start := time.Now()
 	d.run()
 	end := time.Now()

@@ -4,13 +4,14 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/dustin/go-humanize"
-	"github.com/spf13/viper"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/dustin/go-humanize"
+	"github.com/spf13/viper"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -32,14 +33,16 @@ func crossCompile(binName string) (string, error) {
 		".",
 	}
 	cmd := exec.Command("go", args...)
-	cmd.Env = append(os.Environ(), "GOOS=linux")
-	cmd.Env = append(os.Environ(), "GOARCH=amd64")
-	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "GOOS=linux")
+	cmd.Env = append(cmd.Env, "GOARCH=amd64")
+	cmd.Env = append(cmd.Env, "CGO_ENABLED=0")
 
 	combinedOut, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("%s\n%s", err, combinedOut)
 	}
+	log.Debug(combinedOut)
 
 	return outputPath, nil
 }
@@ -50,6 +53,7 @@ func BuildPackage(mainFnName string) ([]byte, string, error) {
 	log.Info("Building function")
 	binFile, err := crossCompile("lambda_artifact")
 	if err != nil {
+		log.Debugf("failed to compile: %s", err)
 		return nil, "", err
 	}
 	defer os.RemoveAll(filepath.Dir(binFile)) // Remove temporary binary file
@@ -57,8 +61,10 @@ func BuildPackage(mainFnName string) ([]byte, string, error) {
 	codeHash, err := CodeHash(".")
 
 	if err != nil {
-		log.Errorf("could not generate codehash %s", err)
+		log.Debugf("could not generate codehash %s", err)
 		codeHash = ""
+	} else {
+		log.Debug("generated codehash")
 	}
 
 	log.Debug("Opening recompiled binary to be zipped")
@@ -69,10 +75,12 @@ func BuildPackage(mainFnName string) ([]byte, string, error) {
 
 	zipBuf := new(bytes.Buffer)
 	archive := zip.NewWriter(zipBuf)
+
 	header := &zip.FileHeader{
 		Name:           mainFnName,
 		ExternalAttrs:  (0777 << 16), // File permissions
 		CreatorVersion: (3 << 8),     // Magic number indicating a Unix creator
+		Method: zip.Deflate, //
 	}
 
 	log.Debug("Adding binary to zip archive")

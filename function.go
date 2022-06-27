@@ -2,10 +2,12 @@ package corral
 
 import (
 	"fmt"
-	"github.com/ISE-SMILE/corral/internal/corcache"
-	"github.com/ISE-SMILE/corral/internal/corfs"
 	"runtime/debug"
 	"time"
+
+	"github.com/ISE-SMILE/corral/api"
+	"github.com/ISE-SMILE/corral/internal/corcache"
+	"github.com/ISE-SMILE/corral/internal/corfs"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -30,7 +32,7 @@ func handle(driver *Driver, hostID func() string, requestID func() string) func(
 		fs, err := corfs.InitFilesystem(task.FileSystemType)
 		if err != nil {
 			result.EEnd = time.Now().UnixNano()
-			return result, err
+			return result, fmt.Errorf("fs init error +%v", err)
 		}
 		log.Debugf("%d - %+v", task.FileSystemType, task)
 		currentJob := driver.jobs[task.JobNumber]
@@ -39,8 +41,15 @@ func handle(driver *Driver, hostID func() string, requestID func() string) func(
 			cache, err := corcache.NewCacheSystem(task.CacheSystemType)
 			if err != nil {
 				result.EEnd = time.Now().UnixNano()
-				return result, err
+				return result, fmt.Errorf("cache create error +%v", err)
 			}
+			//need to init the cache before use..
+			err = cache.Init()
+			if err != nil {
+				result.EEnd = time.Now().UnixNano()
+				return result, fmt.Errorf("cache init error +%v", err)
+			}
+
 			currentJob.cacheSystem = cache
 		}
 
@@ -66,6 +75,11 @@ func handle(driver *Driver, hostID func() string, requestID func() string) func(
 		result.BytesRead = int(currentJob.bytesRead)
 		result.BytesWritten = int(currentJob.bytesWritten)
 		result.EEnd = time.Now().UnixNano()
+
+		result.SWT = int64(api.TryGetCount("SWT"))
+		result.SRT = int64(api.TryGetCount("SRT"))
+		result.CWT = int64(api.TryGetCount("CWT"))
+		result.CRT = int64(api.TryGetCount("CRT"))
 
 		return result, err
 	}

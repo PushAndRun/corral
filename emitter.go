@@ -115,7 +115,8 @@ func (me *mapperEmitter) Emit(key, value string) error {
 	}
 
 	data = append(data, '\n')
-	_, err = writer.Write(data)
+	n, err := writer.Write(data)
+	me.writtenBytes += int64(n)
 	return err
 }
 
@@ -131,7 +132,6 @@ func (me *mapperEmitter) close() error {
 	if len(errs) > 0 {
 		return errors.New(strings.Join(errs, "\n"))
 	}
-
 	return nil
 }
 

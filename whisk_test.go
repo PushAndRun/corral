@@ -137,6 +137,31 @@ type mockWhiskClient struct {
 	capturedPayload []byte
 }
 
+func (m *mockWhiskClient) PollActivation(activationID string) (io.ReadCloser, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockWhiskClient) ReceiveUntil(when func() bool, timeout *time.Duration) chan io.ReadCloser {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockWhiskClient) InvokeAsBatch(name string, payload []interface{}) ([]interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockWhiskClient) Hint(fname string, payload interface{}, hint *int) (io.ReadCloser, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockWhiskClient) Reset() error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *mockWhiskClient) Invoke(name string, payload interface{}) (io.ReadCloser, error) {
 	data, err := json.Marshal(payload)
 	m.capturedPayload = data
@@ -158,10 +183,6 @@ func (m mockWhiskClient) DeleteFunction(name string) error {
 
 func (m mockWhiskClient) InvokeAsync(name string, payload interface{}) (interface{}, error) {
 	return nil, nil
-}
-
-func (m mockWhiskClient) ReceiveUntil(when func() bool) chan io.ReadCloser {
-	return nil
 }
 
 const inputJson = "{\"action_name\":\"/guest/corral_test\",\"action_version\":\"0.0.34\",\"activation_id\":\"2e5cd3da27b14f4d9cd3da27b15f4dcb\",\"deadline\":\"1611327680624\",\"namespace\":\"guest\",\"transaction_id\":\"lLcUN9mi4f8PILYeFP5bWTLgvoBsiC6j\",\"value\":{\"env\":{\"MINIO_HOST\":\"http://130.149.158.143:32005\",\"MINIO_KEY\":\"smile2021\",\"MINIO_USER\":\"smile\",\"OW_DEBUG\":\"true\"},\"value\":{\"BinID\":1,\"Cleanup\":false,\"FileSystemType\":2,\"IntermediateBins\":1,\"JobNumber\":0,\"Phase\":0,\"Splits\":[{\"EndOffset\":112639,\"Filename\":\"s3://input/metamorphosis.txt\",\"StartOffset\":102400},{\"EndOffset\":122879,\"Filename\":\"s3://input/metamorphosis.txt\",\"StartOffset\":112640},{\"EndOffset\":133119,\"Filename\":\"s3://input/metamorphosis.txt\",\"StartOffset\":122880},{\"EndOffset\":139053,\"Filename\":\"s3://input/metamorphosis.txt\",\"StartOffset\":133120}],\"WorkingLocation\":\"minio://results\"}}}"
