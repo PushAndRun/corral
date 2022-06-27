@@ -185,7 +185,7 @@ func loop(ack string) {
 	var out *os.File
 
 	//register LCH
-	whiskActivateHooks(out, &logBuffer)
+	whiskActivateHooks(out)
 
 	if os.Getenv("MOCK") != "" {
 		out = os.Stdout
