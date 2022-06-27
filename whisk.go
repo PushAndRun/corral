@@ -170,7 +170,6 @@ func newWhiskExecutor(functionName string) *whiskExecutor {
 //this implements a process execution using system in and out...
 //this is a modified version of https://github.com/apache/openwhisk-runtime-go/blob/master/examples/standalone/exec.go
 func loop(ack string) {
-	//register LCH
 
 	var logBuffer bytes.Buffer
 	logFile := io.Writer(&logBuffer)
@@ -184,6 +183,9 @@ func loop(ack string) {
 
 	// input
 	var out *os.File
+
+	//register LCH
+	whiskActivateHooks(out, &logBuffer)
 
 	if os.Getenv("MOCK") != "" {
 		out = os.Stdout
