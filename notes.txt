@@ -1,0 +1,73 @@
+//from driver
+type config struct {
+	Inputs          []string
+	StageInputs     [][]string
+	SplitSize       int64
+	MapBinSize      int64
+	ReduceBinSize   int64
+	MaxConcurrency  int
+	WorkingLocation string
+	Cleanup         bool
+	Cache           corcache.CacheSystemType
+	Backend         string
+}
+
+//from job
+func (j *Job) CollectMetrics() {
+	metrics, err := api.CollectMetrics(map[string]string{
+		"RId":          "request identifier",
+		"CId":          "container identifier",
+		"HId":          "vm id",
+		"JId":          "job id",
+		"cStart":       "container start time",
+		"eStart":       "execution start",
+		"eEnd":         "execution end",
+		"BytesRead":    "request received",
+		"BytesWritten": "delivery latency",
+		"ObjectWrite":  "ms spent writing to object store",
+		"ObjectRead":   "ms spent reading from object store",
+		"CacheWrite":   "ms spent writing to cache",
+		"CacheRead":    "ms spent reading from cache",
+	})
+
+	if err != nil {
+		log.Errorf("could not collect metrics. cause: %+v", err)
+	} else {
+		j.metrics = metrics
+		j.metrics.Start()
+	}
+}
+
+//from task
+type task struct {
+	JobNumber        int
+	Phase            Phase
+	BinID            uint
+	IntermediateBins uint
+	Splits           []InputSplit
+	FileSystemType   corfs.FileSystemType
+	CacheSystemType  corcache.CacheSystemType
+	WorkingLocation  string
+	Cleanup          bool
+}
+
+type taskResult struct {
+	BytesRead    int
+	BytesWritten int
+
+	Log string
+
+	HId    string `json:"HId"`    //host identifier
+	CId    string `json:"CId"`    //runtime identifier
+	JId    string `json:"JId"`    //job identifier
+	RId    string `json:"RId"`    //request identifier (by platform)
+	CStart int64  `json:"cStart"` //start of runtime
+	EStart int64  `json:"eStart"` //start of request
+	EEnd   int64  `json:"eEnd"`   //end of request
+
+	CWT int64 `json:"CWT"` //Cache WriteTime
+	CRT int64 `json:"CRT"` //Cache ReadTime
+	SWT int64 `json:"SWT"` //S3 WriteTime
+	SRT int64 `json:"SRT"` //S3 ReadTime
+}
+
