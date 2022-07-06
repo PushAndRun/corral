@@ -7,7 +7,7 @@ import (
 	"syscall"
 )
 
-var whiskHooks map[os.Signal]func(*os.File)
+var whiskHooks map[os.Signal]func(*os.File) = make(map[os.Signal]func(*os.File))
 
 func init() {
 	whiskHooks[syscall.SIGINT] = func(out *os.File) {
