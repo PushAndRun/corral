@@ -46,7 +46,6 @@ type WhiskClient struct {
 	multiDeploymentFeature bool
 	hintingFeature         bool
 	deployments            map[string][]WhiskFunctionConfig
-	memory                 int
 
 	metrics *api.Metrics
 	sync.Mutex
@@ -299,8 +298,6 @@ func (l *WhiskClient) DeployFunction(conf WhiskFunctionConfig) error {
 		return err
 	}
 
-	l.memory = conf.Memory
-
 	if !l.multiDeploymentFeature {
 		return l.deployFunction(conf, buildPackage, codeHashDigest)
 	} else {
@@ -455,7 +452,7 @@ func (l *WhiskClient) fetchActivationMetrics(id string) {
 			return
 		}
 
-		l.collectInvocation(invoke, time.Now().UnixMilli(), 0)
+		l.collectInvocation(invoke, time.Now().UnixMilli())
 
 	}
 
@@ -550,7 +547,7 @@ func (l *WhiskClient) PollActivation(activationID string) (io.ReadCloser, error)
 		} else if response.StatusCode == 200 {
 			log.Debugf("polled %s successfully", activationID)
 			l.spawn.TryAllow()
-			l.collectInvocation(invoke, time.Now().UnixMilli(), x)
+			l.collectInvocation(invoke, time.Now().UnixMilli())
 			marshal, err := json.Marshal(invoke.Result)
 			if err == nil {
 				return ioutil.NopCloser(bytes.NewReader(marshal)), nil
@@ -562,7 +559,7 @@ func (l *WhiskClient) PollActivation(activationID string) (io.ReadCloser, error)
 	return nil, fmt.Errorf("could not fetch activation after %d ties in %d", MaxPullRetries, backoff+backoff-1)
 }
 
-func (l *WhiskClient) collectInvocation(invoke *whisk.Activation, rend int64, prematurePolls int) {
+func (l *WhiskClient) collectInvocation(invoke *whisk.Activation, rend int64) {
 	if l.metrics != nil {
 		l.metrics.Collect(map[string]interface{}{
 			"RId":    invoke.ActivationID,
@@ -571,8 +568,6 @@ func (l *WhiskClient) collectInvocation(invoke *whisk.Activation, rend int64, pr
 			"eLat":   invoke.End - invoke.Start,
 			"rEnd":   rend,
 			"dLat":   rend - invoke.End,
-			"pPolls": prematurePolls,
-			"memory": l.memory,
 		})
 	}
 }
