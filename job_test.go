@@ -3,6 +3,7 @@ package corral
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ISE-SMILE/corral/api"
 	"github.com/spf13/viper"
 	"io/ioutil"
 	"os"
@@ -51,7 +52,7 @@ func TestJob_CollectMetrics(t *testing.T) {
 	go job.CollectMetrics()
 
 	for i := 0; i < 10; i++ {
-		job.Collect(taskResult{
+		job.Collect(api.TaskResult{
 			BytesRead:    i,
 			BytesWritten: i,
 			Log:          "",
@@ -80,8 +81,8 @@ func TestJob_CollectMetrics(t *testing.T) {
 }
 
 func TestGenerateRequest(t *testing.T) {
-	tx := task{JobNumber: 0, Phase: 0, BinID: 11, IntermediateBins: 92, FileSystemType: 2, CacheSystemType: 0, WorkingLocation: "minio://tpch/output", Cleanup: false,
-		Splits: []InputSplit{
+	tx := api.Task{JobNumber: 0, Phase: 0, BinID: 11, IntermediateBins: 92, FileSystemType: 2, CacheSystemType: 0, WorkingLocation: "minio://tpch/output", Cleanup: false,
+		Splits: []api.InputSplit{
 			{Filename: "minio://tpch/10/lineitem/lineitem.tbl_ac", StartOffset: 83886080, EndOffset: 94371839},
 			{Filename: "minio://tpch/10/lineitem/lineitem.tbl_ac", StartOffset: 94371840, EndOffset: 104857599},
 			{Filename: "minio://tpch/10/lineitem/lineitem.tbl_ac", StartOffset: 104857600, EndOffset: 115343359},

@@ -1,9 +1,4 @@
-package corral
-
-import (
-	"github.com/ISE-SMILE/corral/internal/corcache"
-	"github.com/ISE-SMILE/corral/internal/corfs"
-)
+package api
 
 // Phase is a descriptor of the phase (i.e. Map or Reduce) of a Job
 type Phase int
@@ -16,22 +11,22 @@ const (
 	SortReducePhase
 )
 
-// task defines a serialized description of a single unit of work
+// Task defines a serialized description of a single unit of work
 // in a MapReduce job, as well as the necessary information for a
 // remote executor to initialize itself and begin working.
-type task struct {
+type Task struct {
 	JobNumber        int
 	Phase            Phase
 	BinID            uint
 	IntermediateBins uint
 	Splits           []InputSplit
-	FileSystemType   corfs.FileSystemType
-	CacheSystemType  corcache.CacheSystemType
+	FileSystemType   FileSystemType
+	CacheSystemType  CacheSystemType
 	WorkingLocation  string
 	Cleanup          bool
 }
 
-type taskResult struct {
+type TaskResult struct {
 	BytesRead    int
 	BytesWritten int
 

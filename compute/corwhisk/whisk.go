@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"github.com/ISE-SMILE/corral/api"
 	"github.com/ISE-SMILE/corral/compute/build"
 	"github.com/apache/openwhisk-client-go/whisk"
 	log "github.com/sirupsen/logrus"
@@ -205,7 +206,7 @@ func setAuthFromProps(auth map[string]string) (string, string, string) {
 	return host, token, namespace
 }
 
-func (l *WhiskClient) preparePayload(payload interface{}) WhiskPayload {
+func (l *WhiskClient) preparePayload(payload api.Task) WhiskPayload {
 	invocation := WhiskPayload{
 		Value: payload,
 		Env:   make(map[string]*string),

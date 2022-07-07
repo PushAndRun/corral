@@ -10,7 +10,7 @@ import (
 
 type WhiskClientApi interface {
 	//Invoke invokes a function of name with a payload, returing the result body as a reader or an error
-	Invoke(name string, payload interface{}) (io.ReadCloser, error)
+	Invoke(name string, payload api.Task) (io.ReadCloser, error)
 
 	//PollActivation uses a exponential backoff algorithm to poll activationID for MAX_RETRIES times to return the result body of an activation or an error
 	PollActivation(activationID string) (io.ReadCloser, error)
@@ -19,9 +19,9 @@ type WhiskClientApi interface {
 	ReceiveUntil(when func() bool, timeout *time.Duration) chan io.ReadCloser
 
 	//InvokeAsBatch (only for platforms that support Batching) sends multiple Invocations at once, returing a list of activation IDs or an error
-	InvokeAsBatch(name string, payload []interface{}) ([]interface{}, error)
+	InvokeAsBatch(name string, payload []api.Task) ([]interface{}, error)
 	//InvokeAsync invokes a single function of name with payload asyncronously, returing the activation ID or an error
-	InvokeAsync(name string, payload interface{}) (interface{}, error)
+	InvokeAsync(name string, payload api.Task) (interface{}, error)
 
 	//DeployFunction deploys a function based on the given config
 	DeployFunction(conf WhiskFunctionConfig) error
@@ -45,6 +45,7 @@ type WhiskClientConfig struct {
 
 	Context           context.Context
 	RemoteLoggingHost string
+	Polling           api.PollingStrategy
 
 	BatchRequestFeature    bool
 	MultiDeploymentFeature bool
@@ -73,6 +74,6 @@ type BatchRequest struct {
 }
 
 type WhiskPayload struct {
-	Value interface{}        `json:"value"`
+	Value api.Task           `json:"value"`
 	Env   map[string]*string `json:"env"`
 }

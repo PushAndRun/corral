@@ -2,6 +2,7 @@ package corral
 
 import (
 	"fmt"
+	"github.com/ISE-SMILE/corral/api"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -12,7 +13,7 @@ type localExecutor struct {
 	Start time.Time
 }
 
-func (l *localExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSplits []InputSplit) error {
+func (l *localExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSplits []api.InputSplit) error {
 	estart := time.Now()
 	// Precaution to avoid running out of memory for reused Lambdas
 	debug.FreeOSMemory()
@@ -20,7 +21,7 @@ func (l *localExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSpli
 	err := job.runMapper(binID, inputSplits)
 
 	eend := time.Now()
-	result := taskResult{
+	result := api.TaskResult{
 		BytesRead:    int(job.bytesRead),
 		BytesWritten: int(job.bytesWritten),
 		HId:          "local",
@@ -44,7 +45,7 @@ func (l *localExecutor) RunReducer(job *Job, jobNumber int, binID uint) error {
 	err := job.runReducer(binID)
 
 	eend := time.Now()
-	result := taskResult{
+	result := api.TaskResult{
 		BytesRead:    int(job.bytesRead),
 		BytesWritten: int(job.bytesWritten),
 		HId:          "local",

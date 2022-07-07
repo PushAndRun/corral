@@ -1,7 +1,7 @@
 package corral
 
 // ValueIterator iterates over a sequence of values.
-// This is used during the Reduce phase, wherein a reduce task
+// This is used during the Reduce phase, wherein a reduce Task
 // iterates over all values for a particular key.
 type ValueIterator struct {
 	values chan string
@@ -18,19 +18,19 @@ func newValueIterator(c chan string) ValueIterator {
 	}
 }
 
-// Mapper defines the interface for a Map task.
+// Mapper defines the interface for a Map Task.
 type Mapper interface {
 	Map(key, value string, emitter Emitter)
 }
 
-// Reducer defines the interface for a Reduce task.
+// Reducer defines the interface for a Reduce Task.
 type Reducer interface {
 	Reduce(key string, values ValueIterator, emitter Emitter)
 }
 
-type PauseFunc 	func() string
-type StopFunc 	func() string
-type HintFunc 	func() string
+type PauseFunc func() string
+type StopFunc func() string
+type HintFunc func() string
 
 // PartitionFunc defines a function that can be used to segment map keys into intermediate buckets.
 // The default partition function simply hashes the key, and takes hash % numBins to determine the bin.
