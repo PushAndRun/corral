@@ -281,13 +281,13 @@ func (r *RedisBackedCache) Flush(fs api.FileSystem) error {
 		if err != nil {
 			return err
 		}
-		defer writer.Close()
+		writer.Close()
 
 		reader, err := r.OpenReader(path, 0)
 		if err != nil {
 			return err
 		}
-		defer reader.Close()
+		reader.Close()
 		moved, err := io.Copy(writer, reader)
 		if err != nil {
 			return err

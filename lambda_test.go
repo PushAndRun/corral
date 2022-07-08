@@ -2,8 +2,8 @@ package corral
 
 import (
 	"encoding/json"
+	"github.com/ISE-SMILE/corral/api"
 	"github.com/ISE-SMILE/corral/compute/corlambda"
-	"github.com/ISE-SMILE/corral/internal/corfs"
 	"os"
 	"testing"
 	"time"
@@ -29,13 +29,13 @@ func TestRunningInLambda(t *testing.T) {
 }
 
 func TestHandleRequest(t *testing.T) {
-	testTask := task{
+	testTask := api.Task{
 		JobNumber:        0,
-		Phase:            MapPhase,
+		Phase:            api.MapPhase,
 		BinID:            0,
 		IntermediateBins: 10,
-		Splits:           []InputSplit{},
-		FileSystemType:   corfs.Local,
+		Splits:           []api.InputSplit{},
+		FileSystemType:   api.Local,
 		WorkingLocation:  ".",
 	}
 
@@ -51,7 +51,7 @@ func TestHandleRequest(t *testing.T) {
 	lambdaDriver.runtimeID = "foo"
 	lambdaDriver.Start = time.Time{}
 
-	mockTaskResult := taskResult{
+	mockTaskResult := api.TaskResult{
 		BytesRead:    0,
 		BytesWritten: 0,
 		Log:          "",
@@ -70,7 +70,7 @@ func TestHandleRequest(t *testing.T) {
 	output.EEnd = 0
 	assert.Equal(t, mockTaskResult, output)
 
-	testTask.Phase = ReducePhase
+	testTask.Phase = api.ReducePhase
 	mockTaskResult.JId = "0_1_0"
 	output, err = handle(lambdaDriver, mockHostID, mockHostID)(testTask)
 
@@ -115,15 +115,15 @@ func TestRunLambdaMapper(t *testing.T) {
 	job := &Job{
 		config: &config{WorkingLocation: "."},
 	}
-	err := executor.RunMapper(job, 0, 10, []InputSplit{})
+	err := executor.RunMapper(job, 0, 10, []api.InputSplit{})
 	assert.Nil(t, err)
 
-	var taskPayload task
+	var taskPayload api.Task
 	err = json.Unmarshal(mock.capturedPayload, &taskPayload)
 	assert.Nil(t, err)
 
 	assert.Equal(t, uint(10), taskPayload.BinID)
-	assert.Equal(t, MapPhase, taskPayload.Phase)
+	assert.Equal(t, api.MapPhase, taskPayload.Phase)
 }
 
 func TestRunLambdaReducer(t *testing.T) {
@@ -142,12 +142,12 @@ func TestRunLambdaReducer(t *testing.T) {
 	err := executor.RunReducer(job, 0, 10)
 	assert.Nil(t, err)
 
-	var taskPayload task
+	var taskPayload api.Task
 	err = json.Unmarshal(mock.capturedPayload, &taskPayload)
 	assert.Nil(t, err)
 
 	assert.Equal(t, uint(10), taskPayload.BinID)
-	assert.Equal(t, ReducePhase, taskPayload.Phase)
+	assert.Equal(t, api.ReducePhase, taskPayload.Phase)
 }
 
 func TestDeployFunction(t *testing.T) {

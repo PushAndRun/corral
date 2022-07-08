@@ -2,9 +2,10 @@ package corral
 
 import (
 	"encoding/json"
+	"github.com/ISE-SMILE/corral/api"
 	"github.com/ISE-SMILE/corral/compute/build"
 	"github.com/ISE-SMILE/corral/compute/corwhisk"
-	"github.com/ISE-SMILE/corral/internal/corfs"
+	"github.com/ISE-SMILE/corral/compute/polling"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -29,13 +30,13 @@ func TestRunningInWhisk(t *testing.T) {
 }
 
 func TestHandleWhiskRequest(t *testing.T) {
-	testTask := task{
+	testTask := api.Task{
 		JobNumber:        0,
-		Phase:            MapPhase,
+		Phase:            api.MapPhase,
 		BinID:            0,
 		IntermediateBins: 10,
-		Splits:           []InputSplit{},
-		FileSystemType:   corfs.Local,
+		Splits:           []api.InputSplit{},
+		FileSystemType:   api.Local,
 		WorkingLocation:  ".",
 	}
 
@@ -51,7 +52,7 @@ func TestHandleWhiskRequest(t *testing.T) {
 	whiskDriver.runtimeID = "foo"
 	whiskDriver.Start = time.Time{}
 
-	mockTaskResult := taskResult{
+	mockTaskResult := api.TaskResult{
 		BytesRead:    0,
 		BytesWritten: 0,
 		Log:          "",
@@ -70,7 +71,7 @@ func TestHandleWhiskRequest(t *testing.T) {
 	output.EEnd = 0
 	assert.Equal(t, mockTaskResult, output)
 
-	testTask.Phase = ReducePhase
+	testTask.Phase = api.ReducePhase
 	mockTaskResult.JId = "0_1_0"
 	output, err = handle(whiskDriver, mockHostID, mockHostID)(testTask)
 
@@ -85,20 +86,21 @@ func TestRunWhiskMapper(t *testing.T) {
 	executor := &whiskExecutor{
 		mock,
 		"FunctionName",
+		&polling.BackoffPolling{},
 	}
 
 	job := &Job{
 		config: &config{WorkingLocation: "."},
 	}
-	err := executor.RunMapper(job, 0, 10, []InputSplit{})
+	err := executor.RunMapper(job, 0, 10, []api.InputSplit{})
 	assert.Nil(t, err)
 
-	var taskPayload task
+	var taskPayload api.Task
 	err = json.Unmarshal(mock.capturedPayload, &taskPayload)
 	assert.Nil(t, err)
 
 	assert.Equal(t, uint(10), taskPayload.BinID)
-	assert.Equal(t, MapPhase, taskPayload.Phase)
+	assert.Equal(t, api.MapPhase, taskPayload.Phase)
 }
 
 func TestRunWhiskReducer(t *testing.T) {
@@ -106,6 +108,7 @@ func TestRunWhiskReducer(t *testing.T) {
 	executor := &whiskExecutor{
 		mock,
 		"FunctionName",
+		&polling.BackoffPolling{},
 	}
 
 	job := &Job{
@@ -114,12 +117,12 @@ func TestRunWhiskReducer(t *testing.T) {
 	err := executor.RunReducer(job, 0, 10)
 	assert.Nil(t, err)
 
-	var taskPayload task
+	var taskPayload api.Task
 	err = json.Unmarshal(mock.capturedPayload, &taskPayload)
 	assert.Nil(t, err)
 
 	assert.Equal(t, uint(10), taskPayload.BinID)
-	assert.Equal(t, ReducePhase, taskPayload.Phase)
+	assert.Equal(t, api.ReducePhase, taskPayload.Phase)
 }
 
 func TestRunWhiskDeployFunction(t *testing.T) {
@@ -127,6 +130,7 @@ func TestRunWhiskDeployFunction(t *testing.T) {
 	executor := &whiskExecutor{
 		mock,
 		"FunctionName",
+		&polling.BackoffPolling{},
 	}
 
 	viper.SetDefault("lambdaManageRole", false) // Disable testing role deployment
@@ -147,7 +151,7 @@ func (m *mockWhiskClient) ReceiveUntil(when func() bool, timeout *time.Duration)
 	panic("implement me")
 }
 
-func (m *mockWhiskClient) InvokeAsBatch(name string, payload []interface{}) ([]interface{}, error) {
+func (m *mockWhiskClient) InvokeAsBatch(name string, payload []api.Task) ([]interface{}, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -162,11 +166,11 @@ func (m *mockWhiskClient) Reset() error {
 	panic("implement me")
 }
 
-func (m *mockWhiskClient) Invoke(name string, payload interface{}) (io.ReadCloser, error) {
+func (m *mockWhiskClient) Invoke(name string, payload api.Task) (io.ReadCloser, error) {
 	data, err := json.Marshal(payload)
 	m.capturedPayload = data
 
-	result := taskResult{}
+	result := api.TaskResult{}
 	data, err = json.Marshal(result)
 
 	return ioutil.NopCloser(strings.NewReader(string(data))), err
@@ -181,7 +185,7 @@ func (m mockWhiskClient) DeleteFunction(name string) error {
 	return nil
 }
 
-func (m mockWhiskClient) InvokeAsync(name string, payload interface{}) (interface{}, error) {
+func (m mockWhiskClient) InvokeAsync(name string, payload api.Task) (interface{}, error) {
 	return nil, nil
 }
 
@@ -217,13 +221,13 @@ func TestWiskLocalRuntime(t *testing.T) {
 	//
 	//flag.Set("backend","whisk")
 
-	mapTask := task{
+	mapTask := api.Task{
 		JobNumber:        0,
-		Phase:            MapPhase,
+		Phase:            api.MapPhase,
 		BinID:            0,
-		Splits:           []InputSplit{},
+		Splits:           []api.InputSplit{},
 		IntermediateBins: job.intermediateBins,
-		FileSystemType:   corfs.MINIO,
+		FileSystemType:   api.MINIO,
 		WorkingLocation:  job.outputPath,
 	}
 

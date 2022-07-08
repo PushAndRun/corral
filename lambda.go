@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/ISE-SMILE/corral/api"
 	"github.com/ISE-SMILE/corral/compute/coriam"
 	"github.com/ISE-SMILE/corral/compute/corlambda"
 	"github.com/ISE-SMILE/corral/internal/corcache"
@@ -70,7 +71,7 @@ func lambdaHostID() string {
 	return lambdaNodeName
 }
 
-func handleRequest(ctx context.Context, task task) (string, error) {
+func handleRequest(ctx context.Context, task api.Task) (string, error) {
 	result, err := handle(lambdaDriver, lambdaHostID, func() string {
 
 		if lc, ok := lambdacontext.FromContext(ctx); ok {
@@ -104,11 +105,11 @@ func newLambdaExecutor(functionName string) *lambdaExecutor {
 	}
 }
 
-func loadTaskResult(payload []byte) taskResult {
+func loadTaskResult(payload []byte) api.TaskResult {
 	// Unescape JSON string
 	payloadStr, _ := strconv.Unquote(string(payload))
 
-	var result taskResult
+	var result api.TaskResult
 	err := json.Unmarshal([]byte(payloadStr), &result)
 	if err != nil {
 		log.Errorf("%s", err)
@@ -127,10 +128,10 @@ func (l *lambdaExecutor) HintSplits(splits uint) error {
 	return nil
 }
 
-func (l *lambdaExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSplits []InputSplit) error {
-	mapTask := task{
+func (l *lambdaExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSplits []api.InputSplit) error {
+	mapTask := api.Task{
 		JobNumber:        jobNumber,
-		Phase:            MapPhase,
+		Phase:            api.MapPhase,
 		BinID:            binID,
 		Splits:           inputSplits,
 		IntermediateBins: job.intermediateBins,
@@ -154,9 +155,9 @@ func (l *lambdaExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSpl
 }
 
 func (l *lambdaExecutor) RunReducer(job *Job, jobNumber int, binID uint) error {
-	mapTask := task{
+	mapTask := api.Task{
 		JobNumber:       jobNumber,
-		Phase:           ReducePhase,
+		Phase:           api.ReducePhase,
 		BinID:           binID,
 		FileSystemType:  corfs.FilesystemType(job.fileSystem),
 		CacheSystemType: corcache.CacheSystemTypes(job.cacheSystem),

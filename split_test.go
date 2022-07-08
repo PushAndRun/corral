@@ -21,9 +21,9 @@ func TestPackInputSplits(t *testing.T) {
 	}
 
 	for _, test := range packingTests {
-		splits := make([]InputSplit, len(test.splitSizes))
+		splits := make([]api.InputSplit, len(test.splitSizes))
 		for i, size := range test.splitSizes {
-			splits[i] = InputSplit{
+			splits[i] = api.InputSplit{
 				StartOffset: 0,
 				EndOffset:   int64(size) - 1,
 			}
@@ -84,7 +84,7 @@ func TestSplitSize(t *testing.T) {
 	}
 
 	for _, test := range splitSizeTests {
-		split := InputSplit{
+		split := api.InputSplit{
 			StartOffset: test.startOffset,
 			EndOffset:   test.endOffset,
 		}

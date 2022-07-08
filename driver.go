@@ -3,6 +3,7 @@ package corral
 import (
 	"context"
 	"fmt"
+	"github.com/ISE-SMILE/corral/compute/polling"
 	"io"
 	"math"
 	"math/rand"
@@ -43,6 +44,7 @@ type Driver struct {
 	config    *config
 	executor  executor
 	cache     api.CacheSystem
+	polling   api.PollingStrategy
 	runtimeID string
 	Start     time.Time
 
@@ -69,8 +71,9 @@ type config struct {
 	MaxConcurrency  int
 	WorkingLocation string
 	Cleanup         bool
-	Cache           corcache.CacheSystemType
+	Cache           api.CacheSystemType
 	Backend         string
+	Polling         api.PollingStrategy
 }
 
 func newConfig() *config {
@@ -101,6 +104,7 @@ func NewDriver(job *Job, options ...Option) *Driver {
 		executor:  &localExecutor{time.Now()},
 		runtimeID: randomName(),
 		Start:     time.Now(),
+		polling:   &polling.BackoffPolling{},
 	}
 
 	c := newConfig()
@@ -113,10 +117,18 @@ func NewDriver(job *Job, options ...Option) *Driver {
 		c.SplitSize = c.MapBinSize
 	}
 
+	if c.SplitSize == 0 || c.MapBinSize == 0 || c.ReduceBinSize == 0 {
+		panic(fmt.Errorf("split sizes can't be 0 split:%d,map:%d,reduce:%d", c.SplitSize, c.MapBinSize, c.ReduceBinSize))
+	}
+
+	if c.Polling != nil {
+		d.polling = c.Polling
+	}
+
 	d.config = c
 	log.Debugf("Loaded config: %#v", c)
 
-	if c.Cache != corcache.NoCache {
+	if c.Cache != api.NoCache {
 		cache, err := corcache.NewCacheSystem(c.Cache)
 		if err != nil {
 			log.Debugf("failed to init cache, %+v", err)
@@ -164,6 +176,7 @@ func WithReduceBinSize(s int64) Option {
 	}
 }
 
+//WithMultipleSize adjusts the splitsize by a multiple. Warn! uses math.Ceil to "round", set the sizes manually if u need precision.
 func WithMultipleSize(mul float64) Option {
 	return func(c *config) {
 		c.ReduceBinSize = int64(math.Ceil(float64(c.ReduceBinSize) * mul))
@@ -188,7 +201,7 @@ func WithInputs(inputs ...string) Option {
 	}
 }
 
-// WithInputs specifies job inputs (i.e. input files/directories)
+// WithMultiStageInputs specifies job inputs (i.e. input files/directories) for each stage
 func WithMultiStageInputs(inputs [][]string) Option {
 	return func(c *config) {
 		c.StageInputs = inputs
@@ -197,13 +210,13 @@ func WithMultiStageInputs(inputs [][]string) Option {
 
 func WithLocalMemoryCache() Option {
 	return func(c *config) {
-		c.Cache = corcache.Local
+		c.Cache = api.InMemory
 	}
 }
 
 func WithRedisBackedCache() Option {
 	return func(c *config) {
-		c.Cache = corcache.Redis
+		c.Cache = api.Redis
 	}
 }
 
@@ -218,6 +231,12 @@ func WithLambdaS3Backend(bucket, key string) Option {
 	return func(c *config) {
 		viper.Set("lambdaS3Bucket", bucket)
 		viper.Set("lambdaS3Key", key)
+	}
+}
+
+func WithBackoffPolling() Option {
+	return func(c *config) {
+		c.Polling = &polling.BackoffPolling{}
 	}
 }
 
@@ -309,7 +328,7 @@ func (d *Driver) runMapPhase(job *Job, jobNumber int, inputs []string) {
 			//XXX: binID casted to uint
 			sem.Acquire(context.Background(), 1)
 			wg.Add(1)
-			go func(bID uint, b []InputSplit) {
+			go func(bID uint, b []api.InputSplit) {
 				defer wg.Done()
 				defer sem.Release(1)
 				defer bar.Increment()
@@ -481,6 +500,24 @@ func (d *Driver) run() {
 
 		*job.config = *d.config
 
+		err := d.polling.StartJob(api.JobInfo{
+			JobId:          idx,
+			Splits:         len(inputs),
+			SplitSize:      d.config.SplitSize,
+			MapBinSize:     d.config.MapBinSize,
+			ReduceBinSize:  d.config.ReduceBinSize,
+			MaxConcurrency: d.config.MaxConcurrency,
+			Backend:        d.config.Backend,
+			FunctionMemory: viper.GetInt("lambdaMemory"),
+			CacheType:      viper.GetInt("cache"),
+			MapLOC:         0, //TODO
+			ReduceLoc:      0, //TODO
+		})
+		if err != nil {
+			log.Debugf("failed to init polling %+e", err)
+			panic(err)
+		}
+
 		d.runMapPhase(job, idx, inputs)
 		d.runReducePhase(job, idx)
 
@@ -577,7 +614,7 @@ func (d *Driver) WithBackend(backendType *string) {
 		if *backendType == "lambda" {
 			d.executor = newLambdaExecutor(viper.GetString("lambdaFunctionName"))
 		} else if *backendType == "whisk" {
-			d.executor = newWhiskExecutor(viper.GetString("lambdaFunctionName"))
+			d.executor = newWhiskExecutor(viper.GetString("lambdaFunctionName"), d.polling)
 		} else {
 			log.Warnf("unknowen backend flag %+v", *backendType)
 		}
@@ -605,7 +642,7 @@ func (d *Driver) Undeploy(backendType *string) error {
 	if *backendType == "lambda" {
 		backend = newLambdaExecutor(viper.GetString("lambdaFunctionName"))
 	} else if *backendType == "whisk" {
-		backend = newWhiskExecutor(viper.GetString("lambdaFunctionName"))
+		backend = newWhiskExecutor(viper.GetString("lambdaFunctionName"), nil)
 	} else {
 		return fmt.Errorf("unkown backend flag")
 	}

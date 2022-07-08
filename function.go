@@ -13,12 +13,12 @@ import (
 )
 
 //takes a driver and a hostID and requestID and returns the main worker function for these parameters
-func handle(driver *Driver, hostID func() string, requestID func() string) func(task task) (taskResult, error) {
-	return func(task task) (taskResult, error) {
+func handle(driver *Driver, hostID func() string, requestID func() string) func(task api.Task) (api.TaskResult, error) {
+	return func(task api.Task) (api.TaskResult, error) {
 		estart := time.Now()
 		// Precaution to avoid running out of memory for reused Lambdas
 		debug.FreeOSMemory()
-		result := taskResult{
+		result := api.TaskResult{
 			HId:    hostID(),
 			CId:    driver.runtimeID,
 			RId:    requestID(),
@@ -37,7 +37,7 @@ func handle(driver *Driver, hostID func() string, requestID func() string) func(
 		log.Debugf("%d - %+v", task.FileSystemType, task)
 		currentJob := driver.jobs[task.JobNumber]
 
-		if task.CacheSystemType != corcache.NoCache {
+		if task.CacheSystemType != api.NoCache {
 			cache, err := corcache.NewCacheSystem(task.CacheSystemType)
 			if err != nil {
 				result.EEnd = time.Now().UnixNano()
@@ -64,9 +64,9 @@ func handle(driver *Driver, hostID func() string, requestID func() string) func(
 		currentJob.bytesWritten = 0
 
 		switch task.Phase {
-		case MapPhase:
+		case api.MapPhase:
 			err = currentJob.runMapper(task.BinID, task.Splits)
-		case ReducePhase:
+		case api.ReducePhase:
 			err = currentJob.runReducer(task.BinID)
 		default:
 			err = fmt.Errorf("Unknown phase: %d", task.Phase)
