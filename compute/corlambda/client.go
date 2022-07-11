@@ -27,7 +27,8 @@ const MaxLambdaRetries = 3
 // LambdaClient wraps the AWS Lambda API and provides functions for
 // deploying and invoking lambda functions
 type LambdaClient struct {
-	Client lambdaiface.LambdaAPI
+	Client  lambdaiface.LambdaAPI
+	Polling api.PollingStrategy
 }
 
 type LambdaCacheConfigInjector interface {
@@ -325,6 +326,8 @@ func (l *LambdaClient) tryInvoke(functionName string, payload []byte) ([]byte, e
 	}
 	return output.Payload, err
 }
+
+//TODO implement AsyncInvoke and use Polling
 
 // Invoke invokes the given Lambda function with the given payload.
 func (l *LambdaClient) Invoke(functionName string, payload []byte) (outputPayload []byte, err error) {

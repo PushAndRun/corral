@@ -46,6 +46,9 @@ type WhiskClient struct {
 	multiDeploymentFeature bool
 	hintingFeature         bool
 	deployments            map[string][]WhiskFunctionConfig
+	memory                 int
+
+	polling api.PollingStrategy
 
 	metrics *api.Metrics
 	sync.Mutex
@@ -114,6 +117,7 @@ func NewWhiskClient(conf WhiskClientConfig) WhiskClientApi {
 		metrics:                metrics,
 		ConcurrencyLimit:       &conf.ConcurrencyLimit,
 		remoteLoggingHost:      conf.RemoteLoggingHost,
+		polling:                conf.Polling,
 	}
 }
 
@@ -159,11 +163,11 @@ func (l *WhiskClient) Hint(fname string, payload interface{}, hint *int) (io.Rea
 	}
 }
 
-func (l *WhiskClient) Invoke(name string, payload interface{}) (io.ReadCloser, error) {
+func (l *WhiskClient) Invoke(name string, payload api.Task) (io.ReadCloser, error) {
 	return l.tryInvoke(name, l.preparePayload(payload))
 }
 
-func (l *WhiskClient) InvokeAsync(name string, payload interface{}) (interface{}, error) {
+func (l *WhiskClient) InvokeAsync(name string, payload api.Task) (interface{}, error) {
 
 	start, fname, err := l.initInvoke(name, 1)
 	if err != nil {
@@ -210,7 +214,7 @@ func (l *WhiskClient) initInvoke(baseName string, n int) (int64, string, error) 
 	return start, functionName, err
 }
 
-func (l *WhiskClient) InvokeAsBatch(name string, payloads []interface{}) ([]interface{}, error) {
+func (l *WhiskClient) InvokeAsBatch(name string, payloads []api.Task) ([]interface{}, error) {
 	start, fname, err := l.initInvoke(name, len(payloads))
 	if err != nil {
 		log.Debugf("failed to init invoke %s", err)
@@ -297,6 +301,8 @@ func (l *WhiskClient) DeployFunction(conf WhiskFunctionConfig) error {
 		log.Debugf("failed to build package %+v", err)
 		return err
 	}
+
+	l.memory = conf.Memory
 
 	if !l.multiDeploymentFeature {
 		return l.deployFunction(conf, buildPackage, codeHashDigest)
@@ -452,7 +458,7 @@ func (l *WhiskClient) fetchActivationMetrics(id string) {
 			return
 		}
 
-		l.collectInvocation(invoke, time.Now().UnixMilli())
+		l.collectInvocation(invoke, time.Now().UnixMilli(), 0)
 
 	}
 
@@ -492,6 +498,12 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 			} else if response.StatusCode == 202 {
 				if id, ok := invoke["activationId"]; ok {
 					l.startMetricTrace(invoke["activationId"], rstart)
+					l.polling.TaskUpdate(api.TaskInfo{
+						RId:    id.(string),
+						JobId:  invocation.Value.JobNumber,
+						TaskId: int(invocation.Value.BinID),
+						Phase:  int(invocation.Value.Phase),
+					})
 					activation, err := l.PollActivation(id.(string))
 					if err != nil {
 						failures = append(failures, err)
@@ -507,6 +519,12 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 			}
 		} else {
 			log.Warnf("failed [%d/%d]", i, MaxRetries)
+			l.polling.TaskUpdate(api.TaskInfo{
+				JobId:  invocation.Value.JobNumber,
+				TaskId: int(invocation.Value.BinID),
+				Phase:  int(invocation.Value.Phase),
+				Failed: true,
+			})
 			//give back an token, since we failed, (note this could lead to to much call pressure, if backoff is to short and failiures happend to often)
 			l.spawn.Allow()
 		}
@@ -522,32 +540,30 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 }
 
 func (l *WhiskClient) PollActivation(activationID string) (io.ReadCloser, error) {
-	//might want to configuer the backof rate?
-	backoff := 4
-
-	wait := func(backoff int) int {
-		//results not here yet... keep wating
-		<-time.After(time.Second * time.Duration(backoff))
-		//exponential backoff of 4,16,64,256,1024 seconds
-		backoff = backoff * 4
-		log.Debugf("results not ready waiting for %d", backoff)
-		return backoff
-	}
-
 	log.Debugf("polling Activation %s", activationID)
 	for x := 0; x < MaxPullRetries; x++ {
 
 		invoke, response, err := l.Client.Activations.Get(activationID)
 
+		l.polling.TaskUpdate(api.TaskInfo{
+			RId:           activationID,
+			NumberOfPolls: 1,
+		})
+
 		if err != nil || response.StatusCode == 404 {
-			backoff = wait(backoff)
 			if err != nil {
 				log.Debugf("failed to poll %+v", err)
 			}
+			poll, err := l.polling.Poll(l.ctx, activationID)
+			<-poll
+			if err != nil {
+				log.Debugf("failed to wait for poll %+v", err)
+			}
+
 		} else if response.StatusCode == 200 {
 			log.Debugf("polled %s successfully", activationID)
 			l.spawn.TryAllow()
-			l.collectInvocation(invoke, time.Now().UnixMilli())
+			l.collectInvocation(invoke, time.Now().UnixMilli(), x)
 			marshal, err := json.Marshal(invoke.Result)
 			if err == nil {
 				return ioutil.NopCloser(bytes.NewReader(marshal)), nil
@@ -556,10 +572,10 @@ func (l *WhiskClient) PollActivation(activationID string) (io.ReadCloser, error)
 			}
 		}
 	}
-	return nil, fmt.Errorf("could not fetch activation after %d ties in %d", MaxPullRetries, backoff+backoff-1)
+	return nil, fmt.Errorf("could not fetch activation after %d ties", MaxPullRetries)
 }
 
-func (l *WhiskClient) collectInvocation(invoke *whisk.Activation, rend int64) {
+func (l *WhiskClient) collectInvocation(invoke *whisk.Activation, rend int64, prematurePolls int) {
 	if l.metrics != nil {
 		l.metrics.Collect(map[string]interface{}{
 			"RId":    invoke.ActivationID,
@@ -568,6 +584,8 @@ func (l *WhiskClient) collectInvocation(invoke *whisk.Activation, rend int64) {
 			"eLat":   invoke.End - invoke.Start,
 			"rEnd":   rend,
 			"dLat":   rend - invoke.End,
+			"pPolls": prematurePolls,
+			"memory": l.memory,
 		})
 	}
 }

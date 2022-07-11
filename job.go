@@ -43,8 +43,8 @@ type SortJob struct {
 	Job
 }
 
-// Logic for running a single map task
-func (j *Job) runMapper(mapperID uint, splits []InputSplit) error {
+// Logic for running a single map Task
+func (j *Job) runMapper(mapperID uint, splits []api.InputSplit) error {
 	//check if we can use a cacheFS instead
 	var fs api.FileSystem = j.fileSystem
 	if j.cacheSystem != nil {
@@ -82,7 +82,7 @@ func splitInputRecord(record string) *keyValue {
 }
 
 // runMapperSplit runs the mapper on a single InputSplit
-func (j *Job) runMapperSplit(split InputSplit, emitter Emitter) error {
+func (j *Job) runMapperSplit(split api.InputSplit, emitter Emitter) error {
 	offset := split.StartOffset
 	if split.StartOffset != 0 {
 		offset--
@@ -123,7 +123,7 @@ func (j *Job) runMapperSplit(split InputSplit, emitter Emitter) error {
 	return nil
 }
 
-// Logic for running a single reduce task
+// Logic for running a single reduce Task
 func (j *Job) runReducer(binID uint) error {
 	//check if we can use a cacheFS instead
 	var fs api.FileSystem = j.fileSystem
@@ -218,7 +218,7 @@ func (j *Job) runReducer(binID uint) error {
 
 // inputSplits calculates all input files' inputSplits.
 // inputSplits also determines and saves the number of intermediate bins that will be used during the shuffle.
-func (j *Job) inputSplits(inputs []string, maxSplitSize int64) []InputSplit {
+func (j *Job) inputSplits(inputs []string, maxSplitSize int64) []api.InputSplit {
 	files := make([]string, 0)
 	for _, inputPath := range inputs {
 		fileInfos, err := j.fileSystem.ListFiles(inputPath)
@@ -232,7 +232,7 @@ func (j *Job) inputSplits(inputs []string, maxSplitSize int64) []InputSplit {
 		}
 	}
 
-	splits := make([]InputSplit, 0)
+	splits := make([]api.InputSplit, 0)
 	var totalSize int64
 	for _, inputFileName := range files {
 		fInfo, err := j.fileSystem.Stat(inputFileName)
@@ -288,7 +288,7 @@ func (j *Job) CollectMetrics() {
 	}
 }
 
-func (j *Job) Collect(result taskResult) {
+func (j *Job) Collect(result api.TaskResult) {
 	if j.metrics != nil {
 		j.metrics.Collect(map[string]interface{}{
 			"RId":          result.RId,

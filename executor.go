@@ -1,7 +1,9 @@
 package corral
 
+import "github.com/ISE-SMILE/corral/api"
+
 type executor interface {
-	RunMapper(job *Job, jobNumber int, binID uint, inputSplits []InputSplit) error
+	RunMapper(job *Job, jobNumber int, binID uint, inputSplits []api.InputSplit) error
 	RunReducer(job *Job, jobNumber int, binID uint) error
 
 	//HintSplits is called before running a Map/Reducer Step to give the backend a hint on needed scale
@@ -10,6 +12,6 @@ type executor interface {
 
 type smileExecutor interface {
 	executor
-	BatchRunMapper(job *Job, jobNumber int, inputSplits [][]InputSplit) error
+	BatchRunMapper(job *Job, jobNumber int, inputSplits [][]api.InputSplit) error
 	BatchRunReducer(job *Job, jobNumber int, bins []uint) error
 }

@@ -7,21 +7,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// InputSplit contains the information about a contiguous chunk of an input file.
-// startOffset and endOffset are inclusive. For example, if the startOffset was 10
-// and the endOffset was 14, then the InputSplit would describe a 5 byte chunk
-// of the file.
-type InputSplit struct {
-	Filename    string // The file that the input split operates on
-	StartOffset int64  // The starting byte index of the split in the file
-	EndOffset   int64  // The ending byte index (inclusive) of the split in the file
-}
-
-// Size returns the number of bytes that the InputSplit spans
-func (i InputSplit) Size() int64 {
-	return i.EndOffset - i.StartOffset + 1
-}
-
 func min(a, b int64) int64 {
 	if a < b {
 		return a
@@ -29,12 +14,12 @@ func min(a, b int64) int64 {
 	return b
 }
 
-func splitInputFile(file api.FileInfo, maxSplitSize int64) []InputSplit {
-	splits := make([]InputSplit, 0)
+func splitInputFile(file api.FileInfo, maxSplitSize int64) []api.InputSplit {
+	splits := make([]api.InputSplit, 0)
 
 	for startOffset := int64(0); startOffset < file.Size; startOffset += maxSplitSize {
 		endOffset := min(startOffset+maxSplitSize-1, file.Size-1)
-		newSplit := InputSplit{
+		newSplit := api.InputSplit{
 			Filename:    file.Name,
 			StartOffset: startOffset,
 			EndOffset:   endOffset,
@@ -47,21 +32,21 @@ func splitInputFile(file api.FileInfo, maxSplitSize int64) []InputSplit {
 
 // inputBin is a collection of inputSplits.
 type inputBin struct {
-	splits []InputSplit
+	splits []api.InputSplit
 	// The total size of the inputBin. (The sum of the size of all splits)
 	size int64
 }
 
 // packInputSplits partitions inputSplits into bins.
 // The combined size of each bin will be no greater than maxBinSize
-func packInputSplits(splits []InputSplit, maxBinSize int64) [][]InputSplit {
+func packInputSplits(splits []api.InputSplit, maxBinSize int64) [][]api.InputSplit {
 	if len(splits) == 0 {
-		return [][]InputSplit{}
+		return [][]api.InputSplit{}
 	}
 
 	bins := make([]*inputBin, 1)
 	bins[0] = &inputBin{
-		splits: make([]InputSplit, 0),
+		splits: make([]api.InputSplit, 0),
 		size:   0,
 	}
 
@@ -74,14 +59,14 @@ func packInputSplits(splits []InputSplit, maxBinSize int64) [][]InputSplit {
 			currBin.size += split.Size()
 		} else {
 			newBin := &inputBin{
-				splits: []InputSplit{split},
+				splits: []api.InputSplit{split},
 				size:   split.Size(),
 			}
 			bins = append(bins, newBin)
 		}
 	}
 
-	binnedSplits := make([][]InputSplit, len(bins))
+	binnedSplits := make([][]api.InputSplit, len(bins))
 	totalSize := int64(0)
 	for i, bin := range bins {
 		totalSize += bin.size

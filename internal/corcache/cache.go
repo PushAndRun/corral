@@ -8,31 +8,19 @@ import (
 	"github.com/spf13/viper"
 )
 
-// CacheSystemType is an identifier for supported FileSystems
-type CacheSystemType int
-
-// Identifiers for supported FileSystemTypes
-const (
-	NoCache CacheSystemType = iota
-	Local
-	Redis
-	Olric
-	EFS
-)
-
 // NewCacheSystem initializes a CacheSystem of the given type
-func NewCacheSystem(fsType CacheSystemType) (api.CacheSystem, error) {
+func NewCacheSystem(fsType api.CacheSystemType) (api.CacheSystem, error) {
 	var cs api.CacheSystem
 
 	switch fsType {
 	//this implies that
-	case NoCache:
+	case api.NoCache:
 		log.Info("No CacheSystem availible, using FileSystme as fallback")
 		return nil, nil
-	case Local:
+	case api.InMemory:
 		//TODO: make this configururable
 		cs = NewLocalInMemoryProvider(viper.GetUint64("cacheSize"))
-	case Redis:
+	case api.Redis:
 		var err error
 		cs, err = redis_cache.NewRedisBackedCache(viper.GetString("redisDeploymentType"))
 		if err != nil {
@@ -48,18 +36,18 @@ func NewCacheSystem(fsType CacheSystemType) (api.CacheSystem, error) {
 }
 
 // CacheSystemTypes returns a CacheSystemType for a given CacheSystem pointer or the NoCache type.
-func CacheSystemTypes(fs api.CacheSystem) CacheSystemType {
+func CacheSystemTypes(fs api.CacheSystem) api.CacheSystemType {
 	if fs == nil {
-		return NoCache
+		return api.NoCache
 	}
 
 	if _, ok := fs.(*LocalCache); ok {
-		return Local
+		return api.InMemory
 	}
 
 	if _, ok := fs.(*redis_cache.RedisBackedCache); ok {
-		return Redis
+		return api.Redis
 	}
 
-	return NoCache
+	return api.NoCache
 }

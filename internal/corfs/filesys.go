@@ -6,27 +6,17 @@ import (
 	"strings"
 )
 
-// FileSystemType is an identifier for supported FileSystems
-type FileSystemType int
-
-// Identifiers for supported FileSystemTypes
-const (
-	Local FileSystemType = iota
-	S3
-	MINIO
-)
-
 // InitFilesystem intializes a filesystem of the given type
-func InitFilesystem(fsType FileSystemType) (api.FileSystem, error) {
+func InitFilesystem(fsType api.FileSystemType) (api.FileSystem, error) {
 	var fs api.FileSystem
 	switch fsType {
-	case Local:
+	case api.Local:
 		log.Debug("using local fs")
 		fs = &LocalFileSystem{}
-	case S3:
+	case api.S3:
 		log.Debug("using s3 fs")
 		fs = &S3FileSystem{}
-	case MINIO:
+	case api.MINIO:
 		log.Debug("using minio fs")
 		fs = &MinioFileSystem{}
 
@@ -40,17 +30,17 @@ func InitFilesystem(fsType FileSystemType) (api.FileSystem, error) {
 	return fs, nil
 }
 
-func FilesystemType(fs api.FileSystem) FileSystemType {
+func FilesystemType(fs api.FileSystem) api.FileSystemType {
 	if _, ok := fs.(*LocalFileSystem); ok {
-		return Local
+		return api.Local
 	}
 	if _, ok := fs.(*S3FileSystem); ok {
-		return S3
+		return api.S3
 	}
 	if _, ok := fs.(*MinioFileSystem); ok {
-		return MINIO
+		return api.MINIO
 	}
-	return S3
+	return api.S3
 }
 
 // InferFilesystem initializes a filesystem by inferring its type from

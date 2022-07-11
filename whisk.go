@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -78,7 +79,7 @@ func whiskRequestID() string {
 	return os.Getenv("__OW_ACTIVATION_ID")
 }
 
-func handleWhsikRequest(task task) (taskResult, error) {
+func handleWhsikRequest(task api.Task) (api.TaskResult, error) {
 	return handle(whiskDriver, whiskHostID, whiskRequestID)(task)
 }
 
@@ -127,9 +128,10 @@ func handleWhiskHint(out io.Writer) {
 type whiskExecutor struct {
 	WhiskClientApi
 	functionName string
+	polling      api.PollingStrategy
 }
 
-func newWhiskExecutor(functionName string) *whiskExecutor {
+func newWhiskExecutor(functionName string, polling api.PollingStrategy) *whiskExecutor {
 	ctx := context.Background()
 
 	var address *string = nil
@@ -158,11 +160,13 @@ func newWhiskExecutor(functionName string) *whiskExecutor {
 		WriteMetrics:           viper.GetBool("verbose"),
 		Address:                address,
 		RemoteLoggingHost:      viper.GetString("remoteLoggingHost"),
+		Polling:                polling,
 	}
 
 	return &whiskExecutor{
 		WhiskClientApi: NewWhiskClient(config),
 		functionName:   functionName,
+		polling:        polling,
 	}
 }
 
@@ -177,7 +181,7 @@ func loop(ack string) {
 	//log.Printf("ACTION ENV: %v", os.Environ())
 
 	// assign the main function
-	type Action func(event task) (taskResult, error)
+	type Action func(event api.Task) (api.TaskResult, error)
 	var action Action
 	action = handleWhsikRequest
 
@@ -242,7 +246,7 @@ func loop(ack string) {
 		}
 
 		var invocation WhiskPayload
-		var payload task
+		var payload api.Task
 		//Manage input parsing...
 		if value, ok := input["value"].(map[string]interface{}); ok {
 			buffer, _ := json.Marshal(value)
@@ -354,21 +358,44 @@ func checkJobHooks(d *Driver) string {
 	}
 }
 
-func prepareWhiskResult(payload io.ReadCloser) (taskResult, error) {
-	var result taskResult
+func (l *whiskExecutor) prepareWhiskResult(payload io.ReadCloser) (api.TaskResult, error) {
+	var result api.TaskResult
 	data, err := ioutil.ReadAll(payload)
 	if err != nil {
-		return taskResult{}, err
+		return api.TaskResult{}, err
 	}
 
 	log.Debugf("got %s", string(data))
 
 	err = json.Unmarshal(data, &result)
 	if err != nil {
-		return taskResult{}, err
+		return api.TaskResult{}, err
 	}
+	//Task.JobNumber, Task.Phase, Task.BinID),
+
+	ids := parseJId(result)
+
+	_ = l.polling.TaskUpdate(api.TaskInfo{
+		JobId:             ids[0],
+		TaskId:            ids[2],
+		Phase:             ids[1],
+		RequestReceived:   time.Now(),
+		ExecutionDuration: time.Nanosecond*time.Duration(result.EEnd) - time.Nanosecond*time.Duration(result.EStart),
+		RuntimeId:         result.CId,
+		Completed:         true,
+		Failed:            false,
+	})
 
 	return result, nil
+}
+
+func parseJId(result api.TaskResult) []int {
+	var ids []int
+	for _, x := range strings.Split(result.JId, "_") {
+		i, _ := strconv.Atoi(x)
+		ids = append(ids, i)
+	}
+	return ids
 }
 
 func (l *whiskExecutor) Start(d *Driver) {
@@ -386,12 +413,12 @@ type activation struct {
 	ActivationId string `json:"activationId"`
 	Code         int    `json:"statusCode"`
 	Response     struct {
-		Result taskResult `json:"result"`
+		Result api.TaskResult `json:"result"`
 	} `json:"response"`
 }
 
 type WhiskInvokationError struct {
-	invocations map[string]task
+	invocations map[string]api.Task
 }
 
 //HintSplits perform splits*Hint invocations calling the JobHintFunction
@@ -401,16 +428,16 @@ func (l *whiskExecutor) HintSplits(splits uint) error {
 	return err
 }
 
-func (l *whiskExecutor) BatchRunMapper(job *Job, jobNumber int, inputSplits [][]InputSplit) error {
+func (l *whiskExecutor) BatchRunMapper(job *Job, jobNumber int, inputSplits [][]api.InputSplit) error {
 	if !viper.IsSet("eventBatching") || !viper.IsSet("callback") {
 		return fmt.Errorf("can't use batch reducer if eventBatching and callback flags are not set")
 	}
 
-	tasks := make([]task, 0)
+	tasks := make([]api.Task, 0)
 	for binID, bin := range inputSplits {
-		tasks = append(tasks, task{
+		tasks = append(tasks, api.Task{
 			JobNumber:        jobNumber,
-			Phase:            MapPhase,
+			Phase:            api.MapPhase,
 			BinID:            uint(binID),
 			Splits:           bin,
 			IntermediateBins: job.intermediateBins,
@@ -428,11 +455,11 @@ func (l *whiskExecutor) BatchRunReducer(job *Job, jobNumber int, bins []uint) er
 	if !viper.IsSet("eventBatching") || !viper.IsSet("callback") {
 		return fmt.Errorf("can't use batch reducer if eventBatching and callback flags are not set")
 	}
-	tasks := make([]task, 0)
+	tasks := make([]api.Task, 0)
 	for _, binID := range bins {
-		tasks = append(tasks, task{
+		tasks = append(tasks, api.Task{
 			JobNumber:       jobNumber,
-			Phase:           ReducePhase,
+			Phase:           api.ReducePhase,
 			BinID:           binID,
 			FileSystemType:  fs.FilesystemType(job.fileSystem),
 			WorkingLocation: job.outputPath,
@@ -446,10 +473,10 @@ func (l *whiskExecutor) BatchRunReducer(job *Job, jobNumber int, bins []uint) er
 	return <-collector
 }
 
-func (l *whiskExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSplits []InputSplit) error {
-	mapTask := task{
+func (l *whiskExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSplits []api.InputSplit) error {
+	mapTask := api.Task{
 		JobNumber:        jobNumber,
-		Phase:            MapPhase,
+		Phase:            api.MapPhase,
 		BinID:            binID,
 		Splits:           inputSplits,
 		IntermediateBins: job.intermediateBins,
@@ -458,48 +485,67 @@ func (l *whiskExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSpli
 		WorkingLocation:  job.outputPath,
 	}
 
-	resp, err := l.Invoke(l.functionName, mapTask)
-	if err != nil {
-		log.Warnf("invocation failed with err:%+v", err)
-		return err
+	taskResult, err := l.invoke(mapTask)
+	if err == nil {
+		job.Collect(taskResult)
+		atomic.AddInt64(&job.bytesRead, int64(taskResult.BytesRead))
+		atomic.AddInt64(&job.bytesWritten, int64(taskResult.BytesWritten))
 	}
-
-	taskResult, err := prepareWhiskResult(resp)
-	if err != nil {
-		log.Debugf("failed to read result from whisk:%+v", err)
-	}
-	job.Collect(taskResult)
-	atomic.AddInt64(&job.bytesRead, int64(taskResult.BytesRead))
-	atomic.AddInt64(&job.bytesWritten, int64(taskResult.BytesWritten))
-
 	return err
 }
 
 func (l *whiskExecutor) RunReducer(job *Job, jobNumber int, binID uint) error {
-	mapTask := task{
+	mapTask := api.Task{
 		JobNumber:       jobNumber,
-		Phase:           ReducePhase,
+		Phase:           api.ReducePhase,
 		BinID:           binID,
 		FileSystemType:  fs.FilesystemType(job.fileSystem),
 		CacheSystemType: corcache.CacheSystemTypes(job.cacheSystem),
 		WorkingLocation: job.outputPath,
 		Cleanup:         job.config.Cleanup,
 	}
+
+	taskResult, err := l.invoke(mapTask)
+	if err == nil {
+		job.Collect(taskResult)
+		atomic.AddInt64(&job.bytesRead, int64(taskResult.BytesRead))
+		atomic.AddInt64(&job.bytesWritten, int64(taskResult.BytesWritten))
+	}
+
+	return err
+}
+
+func (l *whiskExecutor) invoke(mapTask api.Task) (api.TaskResult, error) {
+	inputs := -1
+	if mapTask.Splits != nil {
+		inputs = len(mapTask.Splits)
+	}
+
+	_ = l.polling.TaskUpdate(api.TaskInfo{
+		JobId:          mapTask.JobNumber,
+		TaskId:         int(mapTask.BinID),
+		Phase:          int(mapTask.Phase),
+		RequestStart:   time.Now(),
+		NumberOfInputs: inputs,
+	})
 	resp, err := l.Invoke(l.functionName, mapTask)
 	if err != nil {
 		log.Warnf("invocation failed with err:%+v", err)
-		return err
+		_ = l.polling.TaskUpdate(api.TaskInfo{
+			JobId:           mapTask.JobNumber,
+			TaskId:          int(mapTask.BinID),
+			Phase:           int(mapTask.Phase),
+			RequestReceived: time.Now(),
+			Failed:          true,
+		})
+		return api.TaskResult{}, err
 	}
 
-	taskResult, err := prepareWhiskResult(resp)
+	taskResult, err := l.prepareWhiskResult(resp)
 	if err != nil {
 		log.Debugf("failed to read result from whisk:%+v", err)
 	}
-	job.Collect(taskResult)
-	atomic.AddInt64(&job.bytesRead, int64(taskResult.BytesRead))
-	atomic.AddInt64(&job.bytesWritten, int64(taskResult.BytesWritten))
-
-	return err
+	return taskResult, nil
 }
 
 func (l *whiskExecutor) Deploy(driver *Driver) error {
@@ -538,11 +584,11 @@ func (e WhiskInvokationError) Error() string {
 
 func NewWhiskInvokationError() *WhiskInvokationError {
 	return &WhiskInvokationError{
-		make(map[string]task),
+		make(map[string]api.Task),
 	}
 }
 
-func (e *WhiskInvokationError) Add(activationId string, t task) {
+func (e *WhiskInvokationError) Add(activationId string, t api.Task) {
 	e.invocations[activationId] = t
 }
 
@@ -557,8 +603,8 @@ func (e *WhiskInvokationError) Activations() []string {
 	return keys
 }
 
-func (e *WhiskInvokationError) FailedTasks() []task {
-	keys := make([]task, len(e.invocations))
+func (e *WhiskInvokationError) FailedTasks() []api.Task {
+	keys := make([]api.Task, len(e.invocations))
 
 	i := 0
 	for _, v := range e.invocations {
@@ -572,7 +618,7 @@ func (e *WhiskInvokationError) isEmpty() bool {
 	return len(e.invocations) <= 0
 }
 
-func (l *whiskExecutor) InvokeBatch(functionName string, tasks []task, activationSet *ActivationSet) error {
+func (l *whiskExecutor) InvokeBatch(functionName string, tasks []api.Task, activationSet *ActivationSet) error {
 	errors := make([]error, 0)
 
 	if !viper.IsSet("eventBatching") || len(tasks) < 4 {
@@ -580,12 +626,19 @@ func (l *whiskExecutor) InvokeBatch(functionName string, tasks []task, activatio
 
 		for _, t := range tasks {
 			iid, err := l.InvokeAsync(functionName, t)
+
 			if err != nil {
 				log.Debugf("failed to send [j:%d|p:%d,b:%d] - %+v", t.JobNumber, t.Phase, t.BinID, err)
 				errors = append(errors, err)
 			}
 			if iid != nil && iid.(string) != "" {
 				activationSet.AddWithData(iid.(string), t)
+				l.polling.TaskUpdate(api.TaskInfo{
+					JobId:  t.JobNumber,
+					TaskId: int(t.BinID),
+					Phase:  int(t.Phase),
+					RId:    iid.(string),
+				})
 				log.Debugf("got activation %+v", iid)
 			} else {
 				log.Debugf("no invocation id for [j:%d|p:%d,b:%d]", t.JobNumber, t.Phase, t.BinID)
@@ -599,7 +652,7 @@ func (l *whiskExecutor) InvokeBatch(functionName string, tasks []task, activatio
 		if batchSize <= 0 {
 			batchSize = 8
 		}
-		taskBatches := make([][]interface{}, 0)
+		taskBatches := make([][]api.Task, 0)
 		batch := 0
 		for i := 0; i < len(tasks); i += batchSize {
 			end := i + batchSize
@@ -609,7 +662,7 @@ func (l *whiskExecutor) InvokeBatch(functionName string, tasks []task, activatio
 			}
 
 			task := tasks[i:end]
-			taskBatch := make([]interface{}, len(task))
+			taskBatch := make([]api.Task, len(task))
 			for i := range task {
 				taskBatch[i] = task[i]
 			}
@@ -619,7 +672,7 @@ func (l *whiskExecutor) InvokeBatch(functionName string, tasks []task, activatio
 		var wg sync.WaitGroup
 		wg.Add(len(taskBatches))
 		for t := 0; t < len(taskBatches); t++ {
-			go func(t int, batch []interface{}) {
+			go func(t int, batch []api.Task) {
 				aIds, err := l.InvokeAsBatch(functionName, batch)
 				log.Debugf("invoked batch %d with %d activations", t, len(aIds))
 				if err != nil {
@@ -628,6 +681,12 @@ func (l *whiskExecutor) InvokeBatch(functionName string, tasks []task, activatio
 					for i, id := range aIds {
 						if s, ok := id.(string); ok {
 							err := activationSet.AddWithData(s, batch[i])
+							l.polling.TaskUpdate(api.TaskInfo{
+								JobId:  batch[i].JobNumber,
+								TaskId: int(batch[i].BinID),
+								Phase:  int(batch[i].Phase),
+								RId:    s,
+							})
 							if err != nil {
 								log.Errorf("failed to add activation id %s to set %+v", s, err)
 								return
@@ -654,8 +713,8 @@ func (l *whiskExecutor) InvokeBatch(functionName string, tasks []task, activatio
 	}
 }
 
-func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]taskResult, error) {
-	taskResults := make([]taskResult, 0)
+func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]api.TaskResult, error) {
+	taskResults := make([]api.TaskResult, 0)
 	invErr := NewWhiskInvokationError()
 
 	//this is a small batch to wait for we rather just pull without all the fuss
@@ -695,19 +754,37 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]taskResult, 
 					return nil, err
 				}
 				log.Debugf("recieved %+v", activation)
-				if activation.Code == 0 && activation.Response.Result.RId != "" {
+				if activation.Code == 0 {
+					if taskResult := activation.Response.Result; taskResult.RId != "" {
 
-					//XXX: danger of nil pointer ... should be validated
-					taskResults = append(taskResults, activation.Response.Result)
+						taskResults = append(taskResults, taskResult)
 
-					activations.Remove(activation.Response.Result.RId)
-					api.TryCollect(map[string]interface{}{
-						"RId":  activation.ActivationId,
-						"rEnd": time.Now().UnixMilli(),
-					})
+						elat := time.Duration(taskResult.EEnd-taskResult.EStart) * time.Nanosecond
 
-					batchWtime += time.Duration(activation.Response.Result.EEnd-activation.Response.Result.EStart) * time.Nanosecond
-					batchWtime /= 2
+						ids := parseJId(taskResult)
+
+						_ = l.polling.TaskUpdate(api.TaskInfo{
+							JobId:             ids[0],
+							TaskId:            ids[2],
+							Phase:             ids[1],
+							RequestReceived:   time.Now(),
+							ExecutionDuration: elat,
+							RuntimeId:         "",
+							Completed:         true,
+						})
+
+						activations.Remove(taskResult.RId)
+						api.TryCollect(map[string]interface{}{
+							"RId":  activation.ActivationId,
+							"rEnd": time.Now().UnixMilli(),
+						})
+
+						batchWtime += elat
+						batchWtime /= 2
+					} else {
+						//TaskResult is nil
+						log.Warnf("unexpected taskresult of %s is nil", activation.ActivationId)
+					}
 
 				} else {
 
@@ -715,7 +792,7 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]taskResult, 
 					log.Debugf("failed %s atemting recovery %+v ", activation.ActivationId, t)
 					//recoverable error
 					if t != nil {
-						invErr.Add(activation.ActivationId, t.(task))
+						invErr.Add(activation.ActivationId, t.(api.Task))
 					} else {
 						return taskResults, fmt.Errorf("unrecoverable error")
 					}
@@ -755,7 +832,15 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]taskResult, 
 					for _, id := range timeouts {
 						t := activations.Remove(id)
 						log.Debugf("killed %s atemting recovery %+v ", id, t)
-						invErr.Add(id, t.(task))
+						invErr.Add(id, t.(api.Task))
+						task := t.(api.Task)
+						l.polling.TaskUpdate(api.TaskInfo{
+							JobId:           task.JobNumber,
+							TaskId:          int(task.BinID),
+							Phase:           int(task.Phase),
+							RequestReceived: time.Now(),
+							Failed:          true,
+						})
 					}
 
 				}
@@ -764,8 +849,8 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]taskResult, 
 	}
 }
 
-func (l *whiskExecutor) pollActivation(remaining []string) ([]taskResult, error) {
-	taskResults := make([]taskResult, 0)
+func (l *whiskExecutor) pollActivation(remaining []string) ([]api.TaskResult, error) {
+	taskResults := make([]api.TaskResult, 0)
 	var fetchError error
 	log.Debugf("callback timed out, polling remaining %d activations", len(remaining))
 	for _, s := range remaining {
@@ -775,7 +860,7 @@ func (l *whiskExecutor) pollActivation(remaining []string) ([]taskResult, error)
 			log.Debugf("failed to fetch activation %s - %+v", s, err)
 			continue
 		}
-		taskResult, err := prepareWhiskResult(activation)
+		taskResult, err := l.prepareWhiskResult(activation)
 		if err != nil {
 			fetchError = err
 			log.Debugf("failed to process whisk result %s - %+v", s, err)
@@ -787,7 +872,7 @@ func (l *whiskExecutor) pollActivation(remaining []string) ([]taskResult, error)
 	return taskResults, fetchError
 }
 
-func (l *whiskExecutor) invokeBatch(job *Job, tasks []task, collector chan error) {
+func (l *whiskExecutor) invokeBatch(job *Job, tasks []api.Task, collector chan error) {
 	activations := NewSet()
 
 	go func() {
@@ -816,6 +901,21 @@ func (l *whiskExecutor) invokeBatch(job *Job, tasks []task, collector chan error
 		collector <- nil
 	}()
 
+	for _, t := range tasks {
+		splits := -1
+		if t.Splits != nil {
+			splits = len(t.Splits)
+		}
+		l.polling.TaskUpdate(api.TaskInfo{
+			JobId:           t.JobNumber,
+			TaskId:          int(t.BinID),
+			Phase:           int(t.Phase),
+			RequestStart:    time.Now(),
+			RequestReceived: time.Time{},
+			NumberOfInputs:  splits,
+		})
+	}
+
 	err := l.InvokeBatch(l.functionName, tasks, activations)
 	if err != nil {
 		log.Warnf("invocation failed with err:%+v", err)
@@ -823,32 +923,32 @@ func (l *whiskExecutor) invokeBatch(job *Job, tasks []task, collector chan error
 	}
 }
 
-func (l *whiskExecutor) tryRecover(inv *WhiskInvokationError) ([]taskResult, error) {
+func (l *whiskExecutor) tryRecover(inv *WhiskInvokationError) ([]api.TaskResult, error) {
 
 	if !inv.isEmpty() {
-		results := make([]taskResult, 0)
+		results := make([]api.TaskResult, 0)
 		log.Debugf("attemt to recover %+v", inv)
 		//attempt recovery
 		toRecover := inv.FailedTasks()
-		jobs := make([][]task, 4)
+		jobs := make([][]api.Task, 4)
 
-		jobs[0] = make([]task, 0)
-		jobs[1] = make([]task, 0)
-		jobs[2] = make([]task, 0)
-		jobs[3] = make([]task, 0)
+		jobs[0] = make([]api.Task, 0)
+		jobs[1] = make([]api.Task, 0)
+		jobs[2] = make([]api.Task, 0)
+		jobs[3] = make([]api.Task, 0)
 
 		for i := 0; i < len(toRecover); i++ {
 			jobs[i%4] = append(jobs[i%4], toRecover[i])
 		}
 		for _, j := range jobs {
-			go func(todo []task) {
+			go func(todo []api.Task) {
 				for _, t := range todo {
 					resp, err := l.Invoke(l.functionName, t)
 					if err != nil {
 						log.Debugf("recovery failed with %+v", err)
 						continue
 					}
-					result, err := prepareWhiskResult(resp)
+					result, err := l.prepareWhiskResult(resp)
 					if err != nil {
 						log.Debugf("recovery failed with %+v", err)
 						continue
@@ -860,7 +960,7 @@ func (l *whiskExecutor) tryRecover(inv *WhiskInvokationError) ([]taskResult, err
 		log.Debugf("recovered %+v", inv)
 		return results, nil
 	}
-	return []taskResult{}, nil
+	return []api.TaskResult{}, nil
 }
 
 func asWiskInvocationError(err error) (*WhiskInvokationError, bool) {
