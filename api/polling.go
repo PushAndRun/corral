@@ -78,4 +78,7 @@ type PollingStrategy interface {
 		This channel should only fire once. To cancel a poll use the context.
 	*/
 	Poll(context context.Context, RId string) (<-chan interface{}, error)
+
+	/*used to coordinate the log creation*/
+	Finalize() error
 }

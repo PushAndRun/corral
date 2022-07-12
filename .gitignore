@@ -20,3 +20,6 @@ bin/
 output-*
 coverage.txt
 .idea/
+compute/polling/jobLog.csv
+.gitignore
+compute/polling/taskLog.csv

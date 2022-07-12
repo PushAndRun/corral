@@ -3,7 +3,6 @@ package corral
 import (
 	"context"
 	"fmt"
-	"github.com/ISE-SMILE/corral/compute/polling"
 	"io"
 	"math"
 	"math/rand"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ISE-SMILE/corral/api"
+	"github.com/ISE-SMILE/corral/compute/polling"
 	"github.com/ISE-SMILE/corral/internal/corcache"
 	"github.com/ISE-SMILE/corral/internal/corfs"
 
@@ -384,6 +384,9 @@ func (d *Driver) runReducePhase(job *Job, jobNumber int) {
 		wg.Wait()
 	}
 	bar.Finish()
+	if viper.GetBool("verbose") || *verbose {
+		d.polling.Finalize()
+	}
 }
 
 func RunningOnCloudPlatfrom() bool {

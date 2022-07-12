@@ -2,10 +2,11 @@ package polling
 
 import (
 	"context"
-	"github.com/ISE-SMILE/corral/api"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/ISE-SMILE/corral/api"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBackoffPolling(t *testing.T) {
@@ -77,4 +78,6 @@ func TestBackoffPolling(t *testing.T) {
 		ReduceLoc:      0,
 	})
 	assert.Nil(t, err, "expected p to be nil")
+
+	polling.Finalize()
 }
