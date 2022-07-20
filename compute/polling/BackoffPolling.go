@@ -48,6 +48,7 @@ type BackoffPolling struct {
 
 func (b *BackoffPolling) StartJob(info api.JobInfo) error {
 	log.Debug(info)
+	info.PollingStrategy = "BackoffPolling"
 	b.backoffCounter = make(map[string]int)
 
 	if b.taskInfos == nil {
