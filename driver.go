@@ -3,6 +3,9 @@ package corral
 import (
 	"context"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"math"
 	"math/rand"
@@ -10,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -40,14 +44,14 @@ func init() {
 
 // Driver controls the execution of a MapReduce Job
 type Driver struct {
-	jobs      []*Job
-	config    *config
-	executor  executor
-	cache     api.CacheSystem
-	polling   api.PollingStrategy
-	runtimeID string
-	Start     time.Time
-
+	jobs       []*Job
+	config     *config
+	executor   executor
+	cache      api.CacheSystem
+	polling    api.PollingStrategy
+	runtimeID  string
+	Start      time.Time
+	seed       int64
 	currentJob int
 	Runtime    time.Duration
 
@@ -74,6 +78,7 @@ type config struct {
 	Cache           api.CacheSystemType
 	Backend         string
 	Polling         api.PollingStrategy
+	QueryID         int64
 }
 
 func newConfig() *config {
@@ -105,7 +110,10 @@ func NewDriver(job *Job, options ...Option) *Driver {
 		runtimeID: randomName(),
 		Start:     time.Now(),
 		polling:   &polling.BackoffPolling{},
+		seed:      time.Now().UnixNano(),
 	}
+
+	rand.Seed(d.seed)
 
 	c := newConfig()
 	for _, f := range options {
@@ -504,7 +512,8 @@ func (d *Driver) run() {
 		*job.config = *d.config
 
 		err := d.polling.StartJob(api.JobInfo{
-			JobId:          idx,
+			JobId:          idx + int(d.seed),
+			QueryID:        int(d.config.QueryID),
 			Splits:         len(inputs),
 			SplitSize:      d.config.SplitSize,
 			MapBinSize:     d.config.MapBinSize,
@@ -513,8 +522,8 @@ func (d *Driver) run() {
 			Backend:        d.config.Backend,
 			FunctionMemory: viper.GetInt("lambdaMemory"),
 			CacheType:      viper.GetInt("cache"),
-			MapLOC:         0, //TODO
-			ReduceLoc:      0, //TODO
+			MapLOC:         d.getLOC("Map", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(int(d.config.QueryID)) + ".go")),
+			ReduceLoc:      d.getLOC("Reduce", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(int(d.config.QueryID)) + ".go")),
 		})
 		if err != nil {
 			log.Debugf("failed to init polling %+e", err)
@@ -657,4 +666,49 @@ func (d *Driver) Undeploy(backendType *string) error {
 	}
 
 	return nil
+}
+
+//based on https://tech.ingrid.com/introduction-ast-golang/
+func (d *Driver) getLOC(functionName string, filePath string) int {
+
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, filePath, nil, parser.AllErrors)
+	if err != nil {
+		panic(err)
+	}
+
+	functionLength := 0
+
+	ast.Inspect(f, func(n ast.Node) bool {
+		if fd, ok := n.(*ast.FuncDecl); ok && fmt.Sprint(fd.Name) == functionName {
+			length := getFunctionBodyLength(fd, fset)
+			if err != nil {
+				panic(err)
+			}
+			log.Debug(fmt.Sprintf("Q%d %s -> LOC: %d", d.config.QueryID, fd.Name, length))
+			functionLength = length
+		}
+		return true
+	})
+	return functionLength
+}
+
+func getFunctionBodyLength(f *ast.FuncDecl, fs *token.FileSet) int {
+	if fs == nil {
+		log.Error("FileSet is nil")
+		return 0
+	}
+	if f.Body == nil {
+		log.Error("Function body is empty")
+		return 0
+	}
+	if !f.Body.Lbrace.IsValid() || !f.Body.Rbrace.IsValid() {
+		log.Error("function %s is not syntactically valid", f.Name.String())
+		return 0
+	}
+	length := fs.Position(f.Body.Rbrace).Line - fs.Position(f.Body.Lbrace).Line - 1
+	if length > 0 {
+		return length
+	}
+	return 0
 }
