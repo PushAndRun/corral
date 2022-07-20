@@ -35,6 +35,9 @@ type Job struct {
 	bytesRead    int64
 	bytesWritten int64
 	metrics      *api.Metrics
+
+	MapComplexity    api.ComplexityType
+	ReduceComplexity api.ComplexityType
 }
 
 //type SortFunc func() int
@@ -314,6 +317,19 @@ func NewJob(mapper Mapper, reducer Reducer) *Job {
 		Map:    mapper,
 		Reduce: reducer,
 		config: &config{},
+	}
+
+	return job
+}
+
+// NewJob creates a new job from a Mapper and Reducer.
+func NewJobWithComplexity(mapper Mapper, reducer Reducer, mapComplexity api.ComplexityType, reduceComplexity api.ComplexityType) *Job {
+	job := &Job{
+		Map:              mapper,
+		Reduce:           reducer,
+		config:           &config{},
+		MapComplexity:    mapComplexity,
+		ReduceComplexity: reduceComplexity,
 	}
 
 	return job

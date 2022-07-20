@@ -13,17 +13,17 @@ func TestBackoffPolling(t *testing.T) {
 	ctx := context.Background()
 	polling := &BackoffPolling{}
 	polling.StartJob(api.JobInfo{
-		JobId:          1,
-		Splits:         10,
-		SplitSize:      512,
-		MapBinSize:     512,
-		ReduceBinSize:  512,
-		MaxConcurrency: 2,
-		Backend:        "local",
-		FunctionMemory: 512,
-		CacheType:      0,
-		MapLOC:         0,
-		ReduceLoc:      0,
+		JobId:            1,
+		Splits:           10,
+		SplitSize:        512,
+		MapBinSize:       512,
+		ReduceBinSize:    512,
+		MaxConcurrency:   2,
+		Backend:          "local",
+		FunctionMemory:   512,
+		CacheType:        0,
+		MapComplexity:    1,
+		ReduceComplexity: 2,
 	})
 
 	polling.TaskUpdate(api.TaskInfo{
@@ -65,17 +65,17 @@ func TestBackoffPolling(t *testing.T) {
 	//this should not fail
 
 	err = polling.StartJob(api.JobInfo{
-		JobId:          1,
-		Splits:         10,
-		SplitSize:      512,
-		MapBinSize:     512,
-		ReduceBinSize:  512,
-		MaxConcurrency: 2,
-		Backend:        "local",
-		FunctionMemory: 512,
-		CacheType:      0,
-		MapLOC:         0,
-		ReduceLoc:      0,
+		JobId:            1,
+		Splits:           10,
+		SplitSize:        512,
+		MapBinSize:       512,
+		ReduceBinSize:    512,
+		MaxConcurrency:   2,
+		Backend:          "local",
+		FunctionMemory:   512,
+		CacheType:        0,
+		MapComplexity:    1,
+		ReduceComplexity: 2,
 	})
 	assert.Nil(t, err, "expected p to be nil")
 

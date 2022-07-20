@@ -27,10 +27,18 @@ type JobInfo struct {
 	CacheType int
 
 	//estimated lines of code for the user defined map function
-	MapLOC int
+	MapComplexity ComplexityType
 	//estimated lines of code for the user defined reduce function
-	ReduceLoc int
+	ReduceComplexity ComplexityType
 }
+
+type ComplexityType int32
+
+const (
+	EASY   ComplexityType = 1
+	MEDIUM ComplexityType = 2
+	HIGH   ComplexityType = 3
+)
 
 type TaskInfo struct {
 	RId string
