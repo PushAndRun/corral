@@ -522,8 +522,8 @@ func (d *Driver) run() {
 			Backend:        d.config.Backend,
 			FunctionMemory: viper.GetInt("lambdaMemory"),
 			CacheType:      viper.GetInt("cache"),
-			MapLOC:         d.getLOC("Map", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(int(d.config.QueryID)) + ".go")),
-			ReduceLoc:      d.getLOC("Reduce", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(int(d.config.QueryID)) + ".go")),
+			MapLOC:         d.getLOC("Map", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(6) + ".go")),
+			ReduceLoc:      d.getLOC("Reduce", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(6) + ".go")),
 		})
 		if err != nil {
 			log.Debugf("failed to init polling %+e", err)
