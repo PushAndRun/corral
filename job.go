@@ -38,6 +38,8 @@ type Job struct {
 
 	MapComplexity    api.ComplexityType
 	ReduceComplexity api.ComplexityType
+
+	TPCHQueryID string
 }
 
 //type SortFunc func() int
@@ -330,6 +332,20 @@ func NewJobWithComplexity(mapper Mapper, reducer Reducer, mapComplexity api.Comp
 		config:           &config{},
 		MapComplexity:    mapComplexity,
 		ReduceComplexity: reduceComplexity,
+	}
+
+	return job
+}
+
+// NewJob creates a new job from a Mapper and Reducer.
+func NewJobWithComplexityAndTPCHQueryID(mapper Mapper, reducer Reducer, mapComplexity api.ComplexityType, reduceComplexity api.ComplexityType, tpchId string) *Job {
+	job := &Job{
+		Map:              mapper,
+		Reduce:           reducer,
+		config:           &config{},
+		MapComplexity:    mapComplexity,
+		ReduceComplexity: reduceComplexity,
+		TPCHQueryID:      tpchId,
 	}
 
 	return job

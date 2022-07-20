@@ -518,6 +518,7 @@ func (d *Driver) run() {
 			CacheType:        viper.GetInt("cache"),
 			MapComplexity:    job.MapComplexity,
 			ReduceComplexity: job.ReduceComplexity,
+			TPCHQueryID:      job.TPCHQueryID,
 			//d.getLOC("Map", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(6) + ".go")),
 			//d.getLOC("Reduce", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(6) + ".go")),
 		})
