@@ -9,6 +9,8 @@ type JobInfo struct {
 	JobId int
 	//Number of the Query to associate the records with the experiment
 	QueryID int
+	//Polling algorithm that was used
+	PollingStrategy string
 	//Total number of Inputs for this job
 	Splits int
 	//SplitSize of this job in byte
