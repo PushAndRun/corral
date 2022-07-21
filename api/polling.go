@@ -6,11 +6,13 @@ import (
 )
 
 type JobInfo struct {
-	JobId int
+	JobId int64
 	//Number of the Query to associate the records with the experiment
 	TPCHQueryID string
 	//Polling algorithm that was used
 	PollingStrategy string
+	//Total number of jobs
+	NumberOfJobs int
 	//Total number of Inputs for this job
 	Splits int
 	//SplitSize of this job in byte
@@ -45,9 +47,13 @@ const (
 type TaskInfo struct {
 	RId string
 	//unique job id
-	JobId int
+	JobId int64
 	//unique task id
-	TaskId int
+	TaskId int64
+	//The number of the job
+	JobNumber int
+	//Id of the Bin
+	BinId int
 	//indecates map/reduce phase
 	Phase int
 	//time the task was sent to the backend
