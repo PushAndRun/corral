@@ -76,6 +76,12 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 
 	if info.Completed || info.Failed {
 		if _, ok := b.backoffCounter[info.RId]; ok {
+			val := b.taskInfos[fmt.Sprint(info.TaskId)]
+			mergo.Merge(&val, api.TaskInfo{
+				NumberOfPolls: b.backoffCounter[info.RId],
+				RId:           info.RId,
+			}, mergo.WithTransformers(timeTransformer{}))
+			b.taskInfos[fmt.Sprint(info.TaskId)] = val
 			delete(b.backoffCounter, info.RId)
 		}
 	}

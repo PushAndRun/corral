@@ -377,6 +377,7 @@ func (l *whiskExecutor) prepareWhiskResult(payload io.ReadCloser) (api.TaskResul
 	ids := parseJId(result)
 
 	_ = l.polling.TaskUpdate(api.TaskInfo{
+		RId:               result.RId,
 		TaskId:            result.TaskId,
 		JobId:             result.JobId,
 		JobNumber:         ids[0],
@@ -858,7 +859,7 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]api.TaskResu
 					timeouts := activations.Top(2)
 					for _, id := range timeouts {
 						t := activations.Remove(id)
-						log.Debugf("killed %s atemting recovery %+v ", id, t)
+						log.Debugf("killed %s atempting recovery %+v ", id, t)
 						invErr.Add(id, t.(api.Task))
 						task := t.(api.Task)
 						l.polling.TaskUpdate(api.TaskInfo{
