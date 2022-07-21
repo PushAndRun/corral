@@ -507,7 +507,7 @@ func (d *Driver) run() {
 		*job.config = *d.config
 
 		err := d.polling.StartJob(api.JobInfo{
-			JobId:            idx + int(d.seed),
+			JobId:            job.JobId,
 			Splits:           len(inputs),
 			SplitSize:        d.config.SplitSize,
 			MapBinSize:       d.config.MapBinSize,

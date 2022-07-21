@@ -2,11 +2,12 @@ package corral
 
 import (
 	"fmt"
-	"github.com/ISE-SMILE/corral/api"
 	"runtime"
 	"runtime/debug"
 	"strconv"
 	"time"
+
+	"github.com/ISE-SMILE/corral/api"
 )
 
 type localExecutor struct {

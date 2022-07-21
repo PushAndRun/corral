@@ -500,8 +500,8 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 					l.startMetricTrace(invoke["activationId"], rstart)
 					l.polling.TaskUpdate(api.TaskInfo{
 						RId:    id.(string),
-						JobId:  invocation.Value.JobNumber,
-						TaskId: int(invocation.Value.BinID),
+						JobId:  invocation.Value.JobId,
+						TaskId: invocation.Value.TaskId,
 						Phase:  int(invocation.Value.Phase),
 					})
 					activation, err := l.PollActivation(id.(string))
@@ -520,8 +520,8 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 		} else {
 			log.Warnf("failed [%d/%d]", i, MaxRetries)
 			l.polling.TaskUpdate(api.TaskInfo{
-				JobId:  invocation.Value.JobNumber,
-				TaskId: int(invocation.Value.BinID),
+				JobId:  invocation.Value.JobId,
+				TaskId: invocation.Value.TaskId,
 				Phase:  int(invocation.Value.Phase),
 				Failed: true,
 			})

@@ -9,6 +9,7 @@ import (
 	"html"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -376,8 +377,10 @@ func (l *whiskExecutor) prepareWhiskResult(payload io.ReadCloser) (api.TaskResul
 	ids := parseJId(result)
 
 	_ = l.polling.TaskUpdate(api.TaskInfo{
-		JobId:             ids[0],
-		TaskId:            ids[2],
+		TaskId:            result.TaskId,
+		JobId:             result.JobId,
+		JobNumber:         ids[0],
+		BinId:             ids[2],
 		Phase:             ids[1],
 		RequestReceived:   time.Now(),
 		ExecutionDuration: time.Nanosecond*time.Duration(result.EEnd) - time.Nanosecond*time.Duration(result.EStart),
@@ -435,8 +438,12 @@ func (l *whiskExecutor) BatchRunMapper(job *Job, jobNumber int, inputSplits [][]
 
 	tasks := make([]api.Task, 0)
 	for binID, bin := range inputSplits {
+		seed := time.Now().UnixNano()
+		rand.Seed(seed)
+
 		tasks = append(tasks, api.Task{
 			JobNumber:        jobNumber,
+			TaskId:           seed,
 			Phase:            api.MapPhase,
 			BinID:            uint(binID),
 			Splits:           bin,
@@ -457,7 +464,10 @@ func (l *whiskExecutor) BatchRunReducer(job *Job, jobNumber int, bins []uint) er
 	}
 	tasks := make([]api.Task, 0)
 	for _, binID := range bins {
+		seed := time.Now().UnixNano()
+		rand.Seed(seed)
 		tasks = append(tasks, api.Task{
+			TaskId:          seed,
 			JobNumber:       jobNumber,
 			Phase:           api.ReducePhase,
 			BinID:           binID,
@@ -474,7 +484,11 @@ func (l *whiskExecutor) BatchRunReducer(job *Job, jobNumber int, bins []uint) er
 }
 
 func (l *whiskExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSplits []api.InputSplit) error {
+	seed := time.Now().UnixNano()
+	rand.Seed(seed)
 	mapTask := api.Task{
+		TaskId:           seed,
+		JobId:            job.JobId,
 		JobNumber:        jobNumber,
 		Phase:            api.MapPhase,
 		BinID:            binID,
@@ -495,7 +509,11 @@ func (l *whiskExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSpli
 }
 
 func (l *whiskExecutor) RunReducer(job *Job, jobNumber int, binID uint) error {
+	seed := time.Now().UnixNano()
+	rand.Seed(seed)
 	mapTask := api.Task{
+		TaskId:          seed,
+		JobId:           job.JobId,
 		JobNumber:       jobNumber,
 		Phase:           api.ReducePhase,
 		BinID:           binID,
@@ -522,8 +540,9 @@ func (l *whiskExecutor) invoke(mapTask api.Task) (api.TaskResult, error) {
 	}
 
 	_ = l.polling.TaskUpdate(api.TaskInfo{
-		JobId:          mapTask.JobNumber,
-		TaskId:         int(mapTask.BinID),
+		JobId:          mapTask.JobId,
+		TaskId:         mapTask.TaskId,
+		BinId:          int(mapTask.BinID),
 		Phase:          int(mapTask.Phase),
 		RequestStart:   time.Now(),
 		NumberOfInputs: inputs,
@@ -532,8 +551,9 @@ func (l *whiskExecutor) invoke(mapTask api.Task) (api.TaskResult, error) {
 	if err != nil {
 		log.Warnf("invocation failed with err:%+v", err)
 		_ = l.polling.TaskUpdate(api.TaskInfo{
-			JobId:           mapTask.JobNumber,
-			TaskId:          int(mapTask.BinID),
+			TaskId:          mapTask.TaskId,
+			JobId:           mapTask.JobId,
+			BinId:           int(mapTask.BinID),
 			Phase:           int(mapTask.Phase),
 			RequestReceived: time.Now(),
 			Failed:          true,
@@ -634,10 +654,12 @@ func (l *whiskExecutor) InvokeBatch(functionName string, tasks []api.Task, activ
 			if iid != nil && iid.(string) != "" {
 				activationSet.AddWithData(iid.(string), t)
 				l.polling.TaskUpdate(api.TaskInfo{
-					JobId:  t.JobNumber,
-					TaskId: int(t.BinID),
-					Phase:  int(t.Phase),
-					RId:    iid.(string),
+					TaskId:    t.TaskId,
+					JobId:     t.JobId,
+					JobNumber: t.JobNumber,
+					BinId:     int(t.BinID),
+					Phase:     int(t.Phase),
+					RId:       iid.(string),
 				})
 				log.Debugf("got activation %+v", iid)
 			} else {
@@ -682,10 +704,12 @@ func (l *whiskExecutor) InvokeBatch(functionName string, tasks []api.Task, activ
 						if s, ok := id.(string); ok {
 							err := activationSet.AddWithData(s, batch[i])
 							l.polling.TaskUpdate(api.TaskInfo{
-								JobId:  batch[i].JobNumber,
-								TaskId: int(batch[i].BinID),
-								Phase:  int(batch[i].Phase),
-								RId:    s,
+								TaskId:    batch[i].TaskId,
+								JobId:     batch[i].JobId,
+								JobNumber: batch[i].JobNumber,
+								BinId:     int(batch[i].BinID),
+								Phase:     int(batch[i].Phase),
+								RId:       s,
 							})
 							if err != nil {
 								log.Errorf("failed to add activation id %s to set %+v", s, err)
@@ -764,13 +788,16 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]api.TaskResu
 						ids := parseJId(taskResult)
 
 						_ = l.polling.TaskUpdate(api.TaskInfo{
-							JobId:             ids[0],
-							TaskId:            ids[2],
+							JobId:             taskResult.JobId,
+							TaskId:            taskResult.TaskId,
+							JobNumber:         ids[0],
+							BinId:             ids[2],
 							Phase:             ids[1],
 							RequestReceived:   time.Now(),
 							ExecutionDuration: elat,
 							RuntimeId:         "",
 							Completed:         true,
+							RId:               activation.ActivationId,
 						})
 
 						activations.Remove(taskResult.RId)
@@ -835,8 +862,10 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]api.TaskResu
 						invErr.Add(id, t.(api.Task))
 						task := t.(api.Task)
 						l.polling.TaskUpdate(api.TaskInfo{
-							JobId:           task.JobNumber,
-							TaskId:          int(task.BinID),
+							TaskId:          task.TaskId,
+							JobId:           task.JobId,
+							JobNumber:       task.JobNumber,
+							BinId:           int(task.BinID),
 							Phase:           int(task.Phase),
 							RequestReceived: time.Now(),
 							Failed:          true,
@@ -907,8 +936,10 @@ func (l *whiskExecutor) invokeBatch(job *Job, tasks []api.Task, collector chan e
 			splits = len(t.Splits)
 		}
 		l.polling.TaskUpdate(api.TaskInfo{
-			JobId:           t.JobNumber,
-			TaskId:          int(t.BinID),
+			TaskId:          t.TaskId,
+			JobId:           t.JobId,
+			JobNumber:       t.JobNumber,
+			BinId:           int(t.BinID),
 			Phase:           int(t.Phase),
 			RequestStart:    time.Now(),
 			RequestReceived: time.Time{},

@@ -19,6 +19,8 @@ func handle(driver *Driver, hostID func() string, requestID func() string) func(
 		// Precaution to avoid running out of memory for reused Lambdas
 		debug.FreeOSMemory()
 		result := api.TaskResult{
+			TaskId: task.TaskId,
+			JobId:  task.JobId,
 			HId:    hostID(),
 			CId:    driver.runtimeID,
 			RId:    requestID(),

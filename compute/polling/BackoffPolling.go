@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"reflect"
-	"strconv"
 	"time"
 
 	struct2csv "github.com/dnlo/struct2csv"
@@ -58,7 +57,7 @@ func (b *BackoffPolling) StartJob(info api.JobInfo) error {
 		b.jobInfos = make(map[string]api.JobInfo)
 	}
 
-	b.jobInfos[strconv.Itoa(info.JobId)] = info
+	b.jobInfos[fmt.Sprint(info.JobId)] = info
 
 	return nil
 }
@@ -66,15 +65,13 @@ func (b *BackoffPolling) StartJob(info api.JobInfo) error {
 func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 	log.Info("TaskUpdate called with: " + fmt.Sprint(info))
 
-	taskId := strconv.Itoa(info.JobId) + "-" + strconv.Itoa(info.TaskId)
-
-	if val, ok := b.taskInfos[taskId]; ok {
+	if val, ok := b.taskInfos[fmt.Sprint(info.TaskId)]; ok {
 		//update entry
 		mergo.Merge(&val, info, mergo.WithTransformers(timeTransformer{}))
-		b.taskInfos[taskId] = val
+		b.taskInfos[fmt.Sprint(info.TaskId)] = val
 	} else {
 		//create entry
-		b.taskInfos[taskId] = info
+		b.taskInfos[fmt.Sprint(info.TaskId)] = info
 	}
 
 	if info.Completed || info.Failed {
