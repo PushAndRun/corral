@@ -386,7 +386,7 @@ func (l *whiskExecutor) prepareWhiskResult(payload io.ReadCloser) (api.TaskResul
 		//Phase:             ids[1],
 		RequestReceived:           time.Now(),
 		FunctionExecutionEnd:      result.EEnd,
-		FunctionExecutionDuration: int64(time.Duration(result.EEnd) - time.Duration(result.EStart)),
+		FunctionExecutionDuration: int64(time.Duration(result.EEnd)*time.Nanosecond - time.Duration(result.EStart)*time.Nanosecond),
 		RuntimeId:                 result.CId,
 		Completed:                 true,
 		Failed:                    false,
@@ -537,13 +537,14 @@ func (l *whiskExecutor) invoke(mapTask api.Task) (api.TaskResult, error) {
 	}
 
 	_ = l.polling.TaskUpdate(api.TaskInfo{
-		JobId:          mapTask.JobId,
-		TaskId:         mapTask.TaskId,
-		BinId:          int(mapTask.BinID),
-		Phase:          int(mapTask.Phase),
-		JobNumber:      int(mapTask.JobNumber),
-		RequestStart:   time.Now(),
-		NumberOfInputs: inputs,
+		JobId:                  mapTask.JobId,
+		TaskId:                 mapTask.TaskId,
+		BinId:                  int(mapTask.BinID),
+		Phase:                  int(mapTask.Phase),
+		JobNumber:              int(mapTask.JobNumber),
+		RequestStart:           time.Now(),
+		NumberOfInputs:         inputs,
+		NumberOfPrematurePolls: -1,
 	})
 	resp, err := l.Invoke(l.functionName, mapTask)
 	if err != nil {
@@ -791,7 +792,7 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]api.TaskResu
 							//JobNumber:         ids[0],
 							//BinId:             ids[2],
 							//Phase:             ids[1],
-							RequestReceived:           time.Now(),
+							//RequestReceived:           time.Now(),
 							FunctionExecutionDuration: int64(elat),
 							RuntimeId:                 "",
 							Completed:                 true,

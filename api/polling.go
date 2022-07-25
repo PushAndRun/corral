@@ -76,8 +76,6 @@ type TaskInfo struct {
 	FunctionExecutionEnd int64
 	//Duration of the function Execution
 	FunctionExecutionDuration int64
-	// Additional time to deliver the result in ms
-	TotalDeliveryLatency int64
 	//RuntimeId - semi unique identifier of the used execution runtime
 	RuntimeId string
 
@@ -121,8 +119,6 @@ type PollingStrategy interface {
 	Poll(context context.Context, RId string) (<-chan interface{}, error)
 
 	SetFinalPollTime(RId string, timeNano int64)
-
-	SetDeliveryLatency(RId string, latency int64)
 
 	/*used to coordinate the log creation*/
 	Finalize() error

@@ -585,7 +585,6 @@ func (l *WhiskClient) collectInvocation(invoke *whisk.Activation, rend int64, pr
 			"pPolls": prematurePolls,
 			"memory": l.memory,
 		})
-		l.polling.SetDeliveryLatency(invoke.ActivationID, ((rend-invoke.End)+(invoke.End-invoke.Start))*1000000)
 	}
 }
 

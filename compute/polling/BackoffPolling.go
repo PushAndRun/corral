@@ -41,7 +41,6 @@ type BackoffPolling struct {
 	backoffCounter         map[string]int
 	NumberOfPrematurePolls map[string]int
 	FinalPollTime          map[string]int64
-	DeliveryLatency        map[string]int64
 	//Maps to hold the task and job infos for measuring the polling performance
 	taskInfos map[string]api.TaskInfo
 	jobInfos  map[string]api.JobInfo
@@ -53,7 +52,6 @@ func (b *BackoffPolling) StartJob(info api.JobInfo) error {
 	b.backoffCounter = make(map[string]int)
 	b.NumberOfPrematurePolls = make(map[string]int)
 	b.FinalPollTime = make(map[string]int64)
-	b.DeliveryLatency = make(map[string]int64)
 
 	if b.taskInfos == nil {
 		b.taskInfos = make(map[string]api.TaskInfo)
@@ -99,7 +97,6 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 			mergo.MergeWithOverwrite(&val, api.TaskInfo{
 				NumberOfPrematurePolls: b.NumberOfPrematurePolls[info.RId],
 				FinalPollTime:          b.FinalPollTime[info.RId],
-				TotalDeliveryLatency:   b.DeliveryLatency[info.RId],
 				RId:                    info.RId,
 			}, mergo.WithTransformers(timeTransformer{}))
 			b.taskInfos[info.TaskId] = val
@@ -107,14 +104,13 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 			//compute additional statistics
 			if entry, ok := b.taskInfos[info.TaskId]; ok {
 				entry.PollLatency = int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId]) - time.Nanosecond*time.Duration(info.FunctionExecutionEnd))
-				entry.TotalExecutionTime = b.taskInfos[info.TaskId].RequestReceived.UnixNano() - b.taskInfos[info.TaskId].RequestStart.UnixNano()
+				entry.TotalExecutionTime = entry.RequestReceived.UnixNano() - entry.RequestStart.UnixNano()
 				b.taskInfos[info.TaskId] = entry
 			}
 
 			delete(b.backoffCounter, info.RId)
 			delete(b.NumberOfPrematurePolls, info.RId)
 			delete(b.FinalPollTime, info.RId)
-			delete(b.DeliveryLatency, info.RId)
 		}
 	}
 	return nil
@@ -122,10 +118,6 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 
 func (b *BackoffPolling) SetFinalPollTime(RId string, timeNano int64) {
 	b.FinalPollTime[RId] = timeNano
-}
-
-func (b *BackoffPolling) SetDeliveryLatency(RId string, latency int64) {
-	b.DeliveryLatency[RId] = latency
 }
 
 func (b *BackoffPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
