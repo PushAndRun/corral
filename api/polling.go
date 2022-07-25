@@ -40,7 +40,14 @@ type JobInfo struct {
 	ReduceComplexity ComplexityType
 
 	//execution time of the job
-	ExecutionTime int64
+	ExecutionTime  int64
+	MapBinSizes    map[int]int64
+	ReduceBinSizes map[int]int64
+
+	//estimated lines of code for the user defined map function
+	MapLOC int
+	//estimated lines of code for the user defined reduce function
+	ReduceLoc int
 }
 
 type ComplexityType int32
@@ -76,8 +83,6 @@ type TaskInfo struct {
 	FunctionExecutionEnd int64
 	//Duration of the function Execution
 	FunctionExecutionDuration int64
-	// Additional time to deliver the result in ms
-	TotalDeliveryLatency int64
 	//RuntimeId - semi unique identifier of the used execution runtime
 	RuntimeId string
 
@@ -102,6 +107,8 @@ type PollingStrategy interface {
 	*/
 	StartJob(JobInfo) error
 
+	//UpdateJob tasks a already exsisting JobInfo and overwrites data, e.g., for updating reduce split sizes.
+	UpdateJob(JobInfo) error
 	/*
 		JobUpdate updates metadata related to a job. Usually called to set the final job execution time.
 	*/
@@ -121,8 +128,6 @@ type PollingStrategy interface {
 	Poll(context context.Context, RId string) (<-chan interface{}, error)
 
 	SetFinalPollTime(RId string, timeNano int64)
-
-	SetDeliveryLatency(RId string, latency int64)
 
 	/*used to coordinate the log creation*/
 	Finalize() error
