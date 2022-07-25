@@ -12,6 +12,8 @@ import (
 
 	struct2csv "github.com/dnlo/struct2csv"
 
+	"time"
+
 	"github.com/ISE-SMILE/corral/api"
 	"github.com/imdario/mergo"
 	log "github.com/sirupsen/logrus"
@@ -74,6 +76,11 @@ func (b *BackoffPolling) JobUpdate(info api.JobInfo) error {
 		//create entry
 		b.jobInfos[fmt.Sprint(info.JobId)] = info
 	}
+	return nil
+}
+
+func (b *BackoffPolling) UpdateJob(info api.JobInfo) error {
+	log.Debug(info)
 	return nil
 }
 
