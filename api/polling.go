@@ -40,14 +40,10 @@ type JobInfo struct {
 	ReduceComplexity ComplexityType
 
 	//execution time of the job
-	ExecutionTime  int64
+	ExecutionTime int64
+
 	MapBinSizes    map[int]int64
 	ReduceBinSizes map[int]int64
-
-	//estimated lines of code for the user defined map function
-	MapLOC int
-	//estimated lines of code for the user defined reduce function
-	ReduceLoc int
 }
 
 type ComplexityType int32
@@ -64,40 +60,47 @@ type TaskInfo struct {
 	JobId string
 	//unique task id
 	TaskId string
+	//RuntimeId - semi unique identifier of the used execution runtime
+	RuntimeId string
+
+	//indecates map/reduce phase
+	Phase int
 	//The number of the job
 	JobNumber int
+	//Number of Inputs for this task
+	NumberOfInputs int
 	//Id of the Bin
 	BinId int
 	//Size of the Bin
 	BinSize int64
-	//indecates map/reduce phase
-	Phase int
-	//time the task was sent to the backend
-	RequestStart time.Time
-	//time the task was successfully polled by the backend
-	RequestReceived time.Time
+
 	//Total task execution duration including function execution duration and all latencies in ns
 	TotalExecutionTime int64
-
-	//time the task execution was completed
-	FunctionExecutionEnd int64
+	//Time span from request start to function start
+	FunctionStartLatency int64
 	//Duration of the function Execution
 	FunctionExecutionDuration int64
-	//RuntimeId - semi unique identifier of the used execution runtime
-	RuntimeId string
-
-	//Number of Inputs for this task
-	NumberOfInputs int
-	//Number of premature Polls for this task
-	NumberOfPrematurePolls int
-	//Time of the final poll for this task
-	FinalPollTime int64
 	// Latency between task completion and final poll in ns
 	PollLatency int64
+
+	//Number of premature Polls for this task
+	NumberOfPrematurePolls int
+
 	//Indicates if this task is completed, e.g., executed successfully
 	Completed bool
 	//Indicates if this task failed
 	Failed bool
+
+	//time the task was sent to the backend
+	RequestStart time.Time
+	//time the task was successfully polled by the backend
+	RequestCompletedAndPolled time.Time
+	//time the function started
+	FunctionExecutionStart int64
+	//time the task execution was completed
+	FunctionExecutionEnd int64
+	//Time of the final poll for this task
+	FinalPollTime int64
 }
 
 type PollingStrategy interface {
@@ -107,8 +110,6 @@ type PollingStrategy interface {
 	*/
 	StartJob(JobInfo) error
 
-	//UpdateJob tasks a already exsisting JobInfo and overwrites data, e.g., for updating reduce split sizes.
-	UpdateJob(JobInfo) error
 	/*
 		JobUpdate updates metadata related to a job. Usually called to set the final job execution time.
 	*/

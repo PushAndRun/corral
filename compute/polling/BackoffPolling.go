@@ -8,11 +8,10 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"sync"
 	"time"
 
 	struct2csv "github.com/dnlo/struct2csv"
-
-	"time"
 
 	"github.com/ISE-SMILE/corral/api"
 	"github.com/imdario/mergo"
@@ -40,12 +39,14 @@ func (t timeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Val
 }
 
 type BackoffPolling struct {
+	//Maps to hold the task and job infos for measuring the polling performance
+	taskInfos              map[string]api.TaskInfo
+	jobInfos               map[string]api.JobInfo
 	backoffCounter         map[string]int
 	NumberOfPrematurePolls map[string]int
 	FinalPollTime          map[string]int64
-	//Maps to hold the task and job infos for measuring the polling performance
-	taskInfos map[string]api.TaskInfo
-	jobInfos  map[string]api.JobInfo
+
+	TaskMapMutex sync.RWMutex
 }
 
 func (b *BackoffPolling) StartJob(info api.JobInfo) error {
@@ -54,6 +55,8 @@ func (b *BackoffPolling) StartJob(info api.JobInfo) error {
 	b.backoffCounter = make(map[string]int)
 	b.NumberOfPrematurePolls = make(map[string]int)
 	b.FinalPollTime = make(map[string]int64)
+
+	b.TaskMapMutex = sync.RWMutex{}
 
 	if b.taskInfos == nil {
 		b.taskInfos = make(map[string]api.TaskInfo)
@@ -79,14 +82,10 @@ func (b *BackoffPolling) JobUpdate(info api.JobInfo) error {
 	return nil
 }
 
-func (b *BackoffPolling) UpdateJob(info api.JobInfo) error {
-	log.Debug(info)
-	return nil
-}
-
 func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 	log.Info("TaskUpdate called with: " + fmt.Sprint(info))
 
+	b.TaskMapMutex.Lock()
 	if val, ok := b.taskInfos[fmt.Sprint(info.TaskId)]; ok {
 		//update entry
 		mergo.MergeWithOverwrite(&val, info, mergo.WithTransformers(timeTransformer{}))
@@ -95,31 +94,50 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 		//create entry
 		b.taskInfos[fmt.Sprint(info.TaskId)] = info
 	}
+	b.TaskMapMutex.Unlock()
 
 	if info.Completed || info.Failed {
-		if _, ok := b.NumberOfPrematurePolls[info.RId]; ok {
-			val := b.taskInfos[info.TaskId]
+		b.TaskMapMutex.Lock()
 
-			//merge new information
-			mergo.MergeWithOverwrite(&val, api.TaskInfo{
-				NumberOfPrematurePolls: b.NumberOfPrematurePolls[info.RId],
-				FinalPollTime:          b.FinalPollTime[info.RId],
-				RId:                    info.RId,
-			}, mergo.WithTransformers(timeTransformer{}))
-			b.taskInfos[info.TaskId] = val
+		val := b.taskInfos[info.TaskId]
+		//merge new information
+		mergo.MergeWithOverwrite(&val, api.TaskInfo{
+			NumberOfPrematurePolls: b.NumberOfPrematurePolls[info.RId],
+			FinalPollTime:          b.FinalPollTime[info.RId],
+			RId:                    info.RId,
+		}, mergo.WithTransformers(timeTransformer{}))
+		b.taskInfos[info.TaskId] = val
 
-			//compute additional statistics
-			if entry, ok := b.taskInfos[info.TaskId]; ok {
-				entry.PollLatency = int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId]) - time.Nanosecond*time.Duration(info.FunctionExecutionEnd))
-				entry.TotalExecutionTime = entry.RequestReceived.UnixNano() - entry.RequestStart.UnixNano()
-				b.taskInfos[info.TaskId] = entry
+		//compute additional statistics
+		if entry, ok := b.taskInfos[info.TaskId]; ok {
+			entry.PollLatency = int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId]) - time.Nanosecond*time.Duration(info.FunctionExecutionEnd))
+			entry.TotalExecutionTime = entry.RequestCompletedAndPolled.UnixNano() - entry.RequestStart.UnixNano()
+			entry.FunctionStartLatency = entry.FunctionExecutionStart - entry.RequestStart.UnixNano()
+
+			if entry.Phase == 0 {
+				job := b.jobInfos[entry.JobId]
+				if _, ok := job.MapBinSizes[entry.BinId]; ok {
+					entry.BinSize = job.MapBinSizes[entry.BinId]
+				}
+			}
+			if entry.Phase == 1 {
+				job := b.jobInfos[entry.JobId]
+				if _, ok := job.ReduceBinSizes[entry.BinId]; ok {
+					entry.BinSize = job.ReduceBinSizes[entry.BinId]
+				}
 			}
 
-			delete(b.backoffCounter, info.RId)
-			delete(b.NumberOfPrematurePolls, info.RId)
-			delete(b.FinalPollTime, info.RId)
+			b.taskInfos[info.TaskId] = entry
+
 		}
+
+		b.TaskMapMutex.Unlock()
+
+		delete(b.backoffCounter, info.RId)
+		delete(b.NumberOfPrematurePolls, info.RId)
+		delete(b.FinalPollTime, info.RId)
 	}
+
 	return nil
 }
 
@@ -137,10 +155,10 @@ func (b *BackoffPolling) Poll(context context.Context, RId string) (<-chan inter
 	}
 
 	if last, ok := b.backoffCounter[RId]; ok {
-		b.backoffCounter[RId] = last * 2
+		b.backoffCounter[RId] = backoff * backoff
 		backoff = last
 	} else {
-		backoff = 2
+		backoff = 4
 		b.backoffCounter[RId] = backoff
 	}
 	log.Debugf("Poll backoff %s for %d seconds", RId, backoff)

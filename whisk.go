@@ -384,7 +384,8 @@ func (l *whiskExecutor) prepareWhiskResult(payload io.ReadCloser) (api.TaskResul
 		//JobNumber:         ids[0],
 		//BinId:             ids[2],
 		//Phase:             ids[1],
-		RequestReceived:           time.Now(),
+		RequestCompletedAndPolled: time.Now(),
+		FunctionExecutionStart:    result.EStart,
 		FunctionExecutionEnd:      result.EEnd,
 		FunctionExecutionDuration: int64(time.Duration(result.EEnd)*time.Nanosecond - time.Duration(result.EStart)*time.Nanosecond),
 		RuntimeId:                 result.CId,
@@ -550,12 +551,12 @@ func (l *whiskExecutor) invoke(mapTask api.Task) (api.TaskResult, error) {
 	if err != nil {
 		log.Warnf("invocation failed with err:%+v", err)
 		_ = l.polling.TaskUpdate(api.TaskInfo{
-			TaskId:          mapTask.TaskId,
-			JobId:           mapTask.JobId,
-			BinId:           int(mapTask.BinID),
-			Phase:           int(mapTask.Phase),
-			RequestReceived: time.Now(),
-			Failed:          true,
+			TaskId:                    mapTask.TaskId,
+			JobId:                     mapTask.JobId,
+			BinId:                     int(mapTask.BinID),
+			Phase:                     int(mapTask.Phase),
+			RequestCompletedAndPolled: time.Now(),
+			Failed:                    true,
 		})
 		return api.TaskResult{}, err
 	}
@@ -861,13 +862,13 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]api.TaskResu
 						invErr.Add(id, t.(api.Task))
 						task := t.(api.Task)
 						l.polling.TaskUpdate(api.TaskInfo{
-							TaskId:          task.TaskId,
-							JobId:           task.JobId,
-							JobNumber:       task.JobNumber,
-							BinId:           int(task.BinID),
-							Phase:           int(task.Phase),
-							RequestReceived: time.Now(),
-							Failed:          true,
+							TaskId:                    task.TaskId,
+							JobId:                     task.JobId,
+							JobNumber:                 task.JobNumber,
+							BinId:                     int(task.BinID),
+							Phase:                     int(task.Phase),
+							RequestCompletedAndPolled: time.Now(),
+							Failed:                    true,
 						})
 					}
 
@@ -935,14 +936,14 @@ func (l *whiskExecutor) invokeBatch(job *Job, tasks []api.Task, collector chan e
 			splits = len(t.Splits)
 		}
 		l.polling.TaskUpdate(api.TaskInfo{
-			TaskId:          t.TaskId,
-			JobId:           t.JobId,
-			JobNumber:       t.JobNumber,
-			BinId:           int(t.BinID),
-			Phase:           int(t.Phase),
-			RequestStart:    time.Now(),
-			RequestReceived: time.Time{},
-			NumberOfInputs:  splits,
+			TaskId:                    t.TaskId,
+			JobId:                     t.JobId,
+			JobNumber:                 t.JobNumber,
+			BinId:                     int(t.BinID),
+			Phase:                     int(t.Phase),
+			RequestStart:              time.Now(),
+			RequestCompletedAndPolled: time.Time{},
+			NumberOfInputs:            splits,
 		})
 	}
 

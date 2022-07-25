@@ -15,8 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ISE-SMILE/corral/compute/polling"
-
 	"github.com/ISE-SMILE/corral/api"
 	"github.com/ISE-SMILE/corral/compute/polling"
 	"github.com/ISE-SMILE/corral/internal/corcache"
@@ -245,6 +243,12 @@ func WithBackoffPolling() Option {
 	}
 }
 
+func WithBinSizeLogging() Option {
+	return func(c *config) {
+		viper.Set("collectInputSizes", true)
+	}
+}
+
 func (d *Driver) GetFinalOutputs() []string {
 	return d.lastOutputs
 }
@@ -303,7 +307,7 @@ func (d *Driver) runMapPhase(job *Job, jobNumber int, inputs []string) {
 	log.Debugf("Number of job input splits: %d", len(inputSplits))
 
 	inputBins := packInputSplits(inputSplits, d.config.MapBinSize)
-	go d.collectMapMetrics(jobNumber, inputBins)
+	go d.collectMapMetrics(job.JobId, inputBins)
 	log.Debugf("Number of job input bins: %d", len(inputBins))
 	bar := pb.New(len(inputBins)).Prefix("Map").Start()
 
@@ -535,7 +539,7 @@ func (d *Driver) run() {
 
 		d.runMapPhase(job, idx, inputs)
 
-		go d.collectReducerMetrics(idx, job)
+		go d.collectReducerMetrics(job.JobId, job)
 
 		d.runReducePhase(job, idx)
 
@@ -573,7 +577,7 @@ func (d *Driver) run() {
 	}
 }
 
-func (d *Driver) collectMapMetrics(jId int, inputs [][]api.InputSplit) {
+func (d *Driver) collectMapMetrics(jId string, inputs [][]api.InputSplit) {
 	if !viper.GetBool("collectInputSizes") {
 		return
 	}
@@ -584,13 +588,13 @@ func (d *Driver) collectMapMetrics(jId int, inputs [][]api.InputSplit) {
 			binSizes[bin] += split.Size()
 		}
 	}
-	d.polling.UpdateJob(api.JobInfo{
+	d.polling.JobUpdate(api.JobInfo{
 		JobId:       jId,
 		MapBinSizes: binSizes,
 	})
 }
 
-func (d *Driver) collectReducerMetrics(jId int, j *Job) {
+func (d *Driver) collectReducerMetrics(jId string, j *Job) {
 	if !viper.GetBool("collectInputSizes") {
 		return
 	}
@@ -601,7 +605,8 @@ func (d *Driver) collectReducerMetrics(jId int, j *Job) {
 	}
 
 	// Determine the intermediate data files this reducer is responsible for
-	path := fs.Join(j.outputPath, "map-bin%*")
+	path := fs.Join(j.outputPath, "map-bin*")
+	log.Debug("Path is set to: " + path)
 	files, err := fs.ListFiles(path)
 	if err != nil {
 		log.Debugf("failed to collect reduce metrics cause: %+v", err)
@@ -618,7 +623,7 @@ func (d *Driver) collectReducerMetrics(jId int, j *Job) {
 			binSizes[binIdx] += file.Size
 		}
 	}
-	d.polling.UpdateJob(api.JobInfo{
+	d.polling.JobUpdate(api.JobInfo{
 		JobId:          jId,
 		ReduceBinSizes: binSizes,
 	})
