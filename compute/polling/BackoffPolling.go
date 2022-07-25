@@ -38,8 +38,10 @@ func (t timeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Val
 }
 
 type BackoffPolling struct {
-	backoffCounter map[string]int
-
+	backoffCounter         map[string]int
+	NumberOfPrematurePolls map[string]int
+	FinalPollTime          map[string]int64
+	DeliveryLatency        map[string]int64
 	//Maps to hold the task and job infos for measuring the polling performance
 	taskInfos map[string]api.TaskInfo
 	jobInfos  map[string]api.JobInfo
@@ -49,6 +51,9 @@ func (b *BackoffPolling) StartJob(info api.JobInfo) error {
 	log.Debug(info)
 	info.PollingStrategy = "BackoffPolling"
 	b.backoffCounter = make(map[string]int)
+	b.NumberOfPrematurePolls = make(map[string]int)
+	b.FinalPollTime = make(map[string]int64)
+	b.DeliveryLatency = make(map[string]int64)
 
 	if b.taskInfos == nil {
 		b.taskInfos = make(map[string]api.TaskInfo)
@@ -62,12 +67,24 @@ func (b *BackoffPolling) StartJob(info api.JobInfo) error {
 	return nil
 }
 
+func (b *BackoffPolling) JobUpdate(info api.JobInfo) error {
+	if val, ok := b.jobInfos[fmt.Sprint(info.JobId)]; ok {
+		//update entry
+		mergo.MergeWithOverwrite(&val, info, mergo.WithTransformers(timeTransformer{}))
+		b.jobInfos[fmt.Sprint(info.JobId)] = val
+	} else {
+		//create entry
+		b.jobInfos[fmt.Sprint(info.JobId)] = info
+	}
+	return nil
+}
+
 func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 	log.Info("TaskUpdate called with: " + fmt.Sprint(info))
 
 	if val, ok := b.taskInfos[fmt.Sprint(info.TaskId)]; ok {
 		//update entry
-		mergo.Merge(&val, info, mergo.WithTransformers(timeTransformer{}))
+		mergo.MergeWithOverwrite(&val, info, mergo.WithTransformers(timeTransformer{}))
 		b.taskInfos[fmt.Sprint(info.TaskId)] = val
 	} else {
 		//create entry
@@ -75,35 +92,58 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 	}
 
 	if info.Completed || info.Failed {
-		if _, ok := b.backoffCounter[info.RId]; ok {
-			val := b.taskInfos[fmt.Sprint(info.TaskId)]
-			mergo.Merge(&val, api.TaskInfo{
-				NumberOfPolls: b.backoffCounter[info.RId],
-				RId:           info.RId,
+		if _, ok := b.NumberOfPrematurePolls[info.RId]; ok {
+			val := b.taskInfos[info.TaskId]
+
+			mergo.MergeWithOverwrite(&val, api.TaskInfo{
+				NumberOfPrematurePolls: b.NumberOfPrematurePolls[info.RId],
+				FinalPollTime:          b.FinalPollTime[info.RId],
+				DeliveryLatency:        b.DeliveryLatency[info.RId],
+				PollLatency:            int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId]) - time.Nanosecond*time.Duration(info.ExecutionEnd)),
+				RId:                    info.RId,
 			}, mergo.WithTransformers(timeTransformer{}))
-			b.taskInfos[fmt.Sprint(info.TaskId)] = val
+			b.taskInfos[info.TaskId] = val
+
 			delete(b.backoffCounter, info.RId)
+			delete(b.NumberOfPrematurePolls, info.RId)
+			delete(b.FinalPollTime, info.RId)
+			delete(b.DeliveryLatency, info.RId)
 		}
 	}
 	return nil
 }
 
+func (b *BackoffPolling) SetFinalPollTime(RId string, timeNano int64) {
+	b.FinalPollTime[RId] = timeNano
+}
+
+func (b *BackoffPolling) SetDeliveryLatency(RId string, latency int64) {
+	b.DeliveryLatency[RId] = latency
+}
+
 func (b *BackoffPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
 	var backoff int
+
+	if polls, ok := b.NumberOfPrematurePolls[RId]; ok {
+		b.NumberOfPrematurePolls[RId] = polls + 1
+	} else {
+		b.NumberOfPrematurePolls[RId] = 1
+	}
+
 	if last, ok := b.backoffCounter[RId]; ok {
-		b.backoffCounter[RId] = last + 1
+		b.backoffCounter[RId] = last * 2
 		backoff = last
 	} else {
-		backoff = 4
+		backoff = 2
 		b.backoffCounter[RId] = backoff
 	}
-	log.Debugf("Poll backoff %s for %d seconds", RId, backoff*backoff)
+	log.Debugf("Poll backoff %s for %d seconds", RId, backoff)
 	channel := make(chan interface{})
 	go func() {
 		select {
 		case <-context.Done():
 			channel <- struct{}{}
-		case <-time.After(time.Second * time.Duration(backoff*backoff)):
+		case <-time.After(time.Second * time.Duration(backoff)):
 			channel <- struct{}{}
 		}
 	}()

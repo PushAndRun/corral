@@ -4,16 +4,17 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/ISE-SMILE/corral/api"
-	"github.com/ISE-SMILE/corral/compute/build"
-	"github.com/apache/openwhisk-client-go/whisk"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ISE-SMILE/corral/api"
+	"github.com/ISE-SMILE/corral/compute/build"
+	"github.com/apache/openwhisk-client-go/whisk"
+	log "github.com/sirupsen/logrus"
 )
 
 func init() {

@@ -5,21 +5,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/ISE-SMILE/corral/api"
 	humanize "github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/kjk/betterguid"
 )
 
 // Job is the logical container for a MapReduce job
 type Job struct {
-	JobId         int64
+	JobId         string
 	Map           Mapper
 	Reduce        Reducer
 	PartitionFunc PartitionFunc
@@ -318,10 +318,9 @@ func (j *Job) Collect(result api.TaskResult) {
 
 // NewJob creates a new job from a Mapper and Reducer.
 func NewJob(mapper Mapper, reducer Reducer) *Job {
-	seed := time.Now().UnixNano()
-	rand.Seed(seed)
+
 	job := &Job{
-		JobId:  seed,
+		JobId:  betterguid.New(),
 		Map:    mapper,
 		Reduce: reducer,
 		config: &config{},
@@ -332,10 +331,9 @@ func NewJob(mapper Mapper, reducer Reducer) *Job {
 
 // NewJob creates a new job from a Mapper and Reducer.
 func NewJobWithComplexity(mapper Mapper, reducer Reducer, mapComplexity api.ComplexityType, reduceComplexity api.ComplexityType) *Job {
-	seed := time.Now().UnixNano()
-	rand.Seed(seed)
+
 	job := &Job{
-		JobId:            seed,
+		JobId:            betterguid.New(),
 		Map:              mapper,
 		Reduce:           reducer,
 		config:           &config{},
@@ -348,11 +346,8 @@ func NewJobWithComplexity(mapper Mapper, reducer Reducer, mapComplexity api.Comp
 
 // NewJob creates a new job from a Mapper and Reducer.
 func NewJobWithComplexityAndTPCHQueryID(mapper Mapper, reducer Reducer, mapComplexity api.ComplexityType, reduceComplexity api.ComplexityType, tpchId string) *Job {
-	seed := time.Now().UnixNano()
-	rand.Seed(seed)
-
 	job := &Job{
-		JobId:            seed,
+		JobId:            betterguid.New(),
 		Map:              mapper,
 		Reduce:           reducer,
 		config:           &config{},

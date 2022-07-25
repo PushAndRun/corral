@@ -9,7 +9,6 @@ import (
 	"html"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -20,6 +19,8 @@ import (
 	"time"
 
 	"runtime/debug"
+
+	"github.com/kjk/betterguid"
 
 	api "github.com/ISE-SMILE/corral/api"
 	. "github.com/ISE-SMILE/corral/compute/corwhisk"
@@ -374,16 +375,17 @@ func (l *whiskExecutor) prepareWhiskResult(payload io.ReadCloser) (api.TaskResul
 	}
 	//Task.JobNumber, Task.Phase, Task.BinID),
 
-	ids := parseJId(result)
+	//ids := parseJId(result)
 
 	_ = l.polling.TaskUpdate(api.TaskInfo{
-		RId:               result.RId,
-		TaskId:            result.TaskId,
-		JobId:             result.JobId,
-		JobNumber:         ids[0],
-		BinId:             ids[2],
-		Phase:             ids[1],
+		RId:    result.RId,
+		TaskId: result.TaskId,
+		JobId:  result.JobId,
+		//JobNumber:         ids[0],
+		//BinId:             ids[2],
+		//Phase:             ids[1],
 		RequestReceived:   time.Now(),
+		ExecutionEnd:      result.EEnd,
 		ExecutionDuration: time.Nanosecond*time.Duration(result.EEnd) - time.Nanosecond*time.Duration(result.EStart),
 		RuntimeId:         result.CId,
 		Completed:         true,
@@ -439,12 +441,11 @@ func (l *whiskExecutor) BatchRunMapper(job *Job, jobNumber int, inputSplits [][]
 
 	tasks := make([]api.Task, 0)
 	for binID, bin := range inputSplits {
-		seed := time.Now().UnixNano()
-		rand.Seed(seed)
 
 		tasks = append(tasks, api.Task{
+			JobId:            job.JobId,
 			JobNumber:        jobNumber,
-			TaskId:           seed,
+			TaskId:           betterguid.New(),
 			Phase:            api.MapPhase,
 			BinID:            uint(binID),
 			Splits:           bin,
@@ -465,10 +466,9 @@ func (l *whiskExecutor) BatchRunReducer(job *Job, jobNumber int, bins []uint) er
 	}
 	tasks := make([]api.Task, 0)
 	for _, binID := range bins {
-		seed := time.Now().UnixNano()
-		rand.Seed(seed)
 		tasks = append(tasks, api.Task{
-			TaskId:          seed,
+			JobId:           job.JobId,
+			TaskId:          betterguid.New(),
 			JobNumber:       jobNumber,
 			Phase:           api.ReducePhase,
 			BinID:           binID,
@@ -485,10 +485,8 @@ func (l *whiskExecutor) BatchRunReducer(job *Job, jobNumber int, bins []uint) er
 }
 
 func (l *whiskExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSplits []api.InputSplit) error {
-	seed := time.Now().UnixNano()
-	rand.Seed(seed)
 	mapTask := api.Task{
-		TaskId:           seed,
+		TaskId:           betterguid.New(),
 		JobId:            job.JobId,
 		JobNumber:        jobNumber,
 		Phase:            api.MapPhase,
@@ -510,10 +508,8 @@ func (l *whiskExecutor) RunMapper(job *Job, jobNumber int, binID uint, inputSpli
 }
 
 func (l *whiskExecutor) RunReducer(job *Job, jobNumber int, binID uint) error {
-	seed := time.Now().UnixNano()
-	rand.Seed(seed)
 	mapTask := api.Task{
-		TaskId:          seed,
+		TaskId:          betterguid.New(),
 		JobId:           job.JobId,
 		JobNumber:       jobNumber,
 		Phase:           api.ReducePhase,
@@ -545,6 +541,7 @@ func (l *whiskExecutor) invoke(mapTask api.Task) (api.TaskResult, error) {
 		TaskId:         mapTask.TaskId,
 		BinId:          int(mapTask.BinID),
 		Phase:          int(mapTask.Phase),
+		JobNumber:      int(mapTask.JobNumber),
 		RequestStart:   time.Now(),
 		NumberOfInputs: inputs,
 	})
@@ -786,14 +783,14 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]api.TaskResu
 
 						elat := time.Duration(taskResult.EEnd-taskResult.EStart) * time.Nanosecond
 
-						ids := parseJId(taskResult)
+						//ids := parseJId(taskResult)
 
 						_ = l.polling.TaskUpdate(api.TaskInfo{
-							JobId:             taskResult.JobId,
-							TaskId:            taskResult.TaskId,
-							JobNumber:         ids[0],
-							BinId:             ids[2],
-							Phase:             ids[1],
+							JobId:  taskResult.JobId,
+							TaskId: taskResult.TaskId,
+							//JobNumber:         ids[0],
+							//BinId:             ids[2],
+							//Phase:             ids[1],
 							RequestReceived:   time.Now(),
 							ExecutionDuration: elat,
 							RuntimeId:         "",

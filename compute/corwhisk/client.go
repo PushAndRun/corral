@@ -468,7 +468,8 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 	failures := make([]error, 0)
 	for i := 0; i < MaxRetries; i++ {
 		rstart, fname, err := l.initInvoke(name, 1)
-		invoke, response, err := l.Client.Actions.Invoke(fname, invocation, true, true)
+		//change to false to switch from synchronous calls to polling only
+		invoke, response, err := l.Client.Actions.Invoke(fname, invocation, false, false)
 		rend := time.Now().UnixMilli()
 		log.Debugf("invoke %s took %d ms", fname, rend-rstart)
 		if response == nil && err != nil {
@@ -545,11 +546,6 @@ func (l *WhiskClient) PollActivation(activationID string) (io.ReadCloser, error)
 
 		invoke, response, err := l.Client.Activations.Get(activationID)
 
-		l.polling.TaskUpdate(api.TaskInfo{
-			RId:           activationID,
-			NumberOfPolls: 1,
-		})
-
 		if err != nil || response.StatusCode == 404 {
 			if err != nil {
 				log.Debugf("failed to poll %+v", err)
@@ -561,8 +557,10 @@ func (l *WhiskClient) PollActivation(activationID string) (io.ReadCloser, error)
 			}
 
 		} else if response.StatusCode == 200 {
+
 			log.Debugf("polled %s successfully", activationID)
 			l.spawn.TryAllow()
+			l.polling.SetFinalPollTime(activationID, time.Now().UnixNano())
 			l.collectInvocation(invoke, time.Now().UnixMilli(), x)
 			marshal, err := json.Marshal(invoke.Result)
 			if err == nil {
@@ -587,6 +585,7 @@ func (l *WhiskClient) collectInvocation(invoke *whisk.Activation, rend int64, pr
 			"pPolls": prematurePolls,
 			"memory": l.memory,
 		})
+		l.polling.SetDeliveryLatency(invoke.ActivationID, rend-invoke.End)
 	}
 }
 

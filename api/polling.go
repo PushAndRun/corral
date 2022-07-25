@@ -6,13 +6,17 @@ import (
 )
 
 type JobInfo struct {
-	JobId int64
+	JobId string
 	//Number of the Query to associate the records with the experiment
 	TPCHQueryID string
 	//Polling algorithm that was used
 	PollingStrategy string
 	//Total number of jobs
 	NumberOfJobs int
+	//Current job number
+	JobNumber int
+	//Bytes written by the previous job
+	PrevJobBytesWritten int64
 	//Total number of Inputs for this job
 	Splits int
 	//SplitSize of this job in byte
@@ -30,10 +34,13 @@ type JobInfo struct {
 	//CacheType reference
 	CacheType int
 
-	//estimated lines of code for the user defined map function
+	//estimated complexity for the user defined map function (1,2,3)
 	MapComplexity ComplexityType
-	//estimated lines of code for the user defined reduce function
+	//estimated complexity e for the user defined reduce function (1,2,3)
 	ReduceComplexity ComplexityType
+
+	//execution time of the job
+	ExecutionTime int64
 }
 
 type ComplexityType int32
@@ -47,13 +54,15 @@ const (
 type TaskInfo struct {
 	RId string
 	//unique job id
-	JobId int64
+	JobId string
 	//unique task id
-	TaskId int64
+	TaskId string
 	//The number of the job
 	JobNumber int
 	//Id of the Bin
 	BinId int
+	//Size of the Bin
+	BinSize int64
 	//indecates map/reduce phase
 	Phase int
 	//time the task was sent to the backend
@@ -61,15 +70,23 @@ type TaskInfo struct {
 	//time the task was successfully polled by the backend
 	RequestReceived time.Time
 
+	//time the task execution was completed
+	ExecutionEnd int64
 	//Duration of the task Execution
 	ExecutionDuration time.Duration
+	// Additional time to deliver the result
+	DeliveryLatency int64
 	//RuntimeId - semi unique identifier of the used execution runtime
 	RuntimeId string
 
-	//Number of Inputs for this Task
+	//Number of Inputs for this task
 	NumberOfInputs int
-	//Number of Polls for this Task
-	NumberOfPolls int
+	//Number of premature Polls for this task
+	NumberOfPrematurePolls int
+	//Time of the final poll for this task
+	FinalPollTime int64
+	// Latency between task completion and final poll in ns
+	PollLatency int64
 	//Indicates if this task is completed, e.g., executed successfully
 	Completed bool
 	//Indicates if this task failed
@@ -84,6 +101,11 @@ type PollingStrategy interface {
 	StartJob(JobInfo) error
 
 	/*
+		JobUpdate updates metadata related to a job. Usually called to set the final job execution time.
+	*/
+	JobUpdate(JobInfo) error
+
+	/*
 		TaskUpdate updates metadata related to a task. Usually called after a Polling
 		attempt.
 	*/
@@ -95,6 +117,10 @@ type PollingStrategy interface {
 		This channel should only fire once. To cancel a poll use the context.
 	*/
 	Poll(context context.Context, RId string) (<-chan interface{}, error)
+
+	SetFinalPollTime(RId string, timeNano int64)
+
+	SetDeliveryLatency(RId string, latency int64)
 
 	/*used to coordinate the log creation*/
 	Finalize() error

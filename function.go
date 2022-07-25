@@ -34,6 +34,7 @@ func handle(driver *Driver, hostID func() string, requestID func() string) func(
 		fs, err := corfs.InitFilesystem(task.FileSystemType)
 		if err != nil {
 			result.EEnd = time.Now().UnixNano()
+			fmt.Println("JID: " + result.JId)
 			return result, fmt.Errorf("fs init error +%v", err)
 		}
 		log.Debugf("%d - %+v", task.FileSystemType, task)

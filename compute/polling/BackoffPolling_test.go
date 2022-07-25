@@ -13,7 +13,7 @@ func TestBackoffPolling(t *testing.T) {
 	ctx := context.Background()
 	polling := &BackoffPolling{}
 	polling.StartJob(api.JobInfo{
-		JobId:            1,
+		JobId:            "1",
 		Splits:           10,
 		SplitSize:        512,
 		MapBinSize:       512,
@@ -27,8 +27,8 @@ func TestBackoffPolling(t *testing.T) {
 	})
 
 	polling.TaskUpdate(api.TaskInfo{
-		JobId:          1,
-		TaskId:         1,
+		JobId:          "1",
+		TaskId:         "1",
 		Phase:          0,
 		RequestStart:   time.Now(),
 		NumberOfInputs: 10,
@@ -36,23 +36,23 @@ func TestBackoffPolling(t *testing.T) {
 
 	polling.TaskUpdate(api.TaskInfo{
 		RId:    "foo",
-		JobId:  1,
-		TaskId: 1,
+		JobId:  "1",
+		TaskId: " 1",
 		Phase:  0,
 	})
 
 	_, err := polling.Poll(ctx, "foo")
 	assert.Nil(t, err, "expected p to be nill")
 	polling.TaskUpdate(api.TaskInfo{
-		RId:           "foo",
-		NumberOfPolls: 1,
+		RId:                    "foo",
+		NumberOfPrematurePolls: 1,
 	})
 	_, err = polling.Poll(ctx, "foo")
 	assert.Nil(t, err, "expected p to be nill")
 
 	polling.TaskUpdate(api.TaskInfo{
-		JobId:     1,
-		TaskId:    1,
+		JobId:     "1",
+		TaskId:    "1",
 		Phase:     0,
 		Completed: true,
 	})
@@ -65,7 +65,7 @@ func TestBackoffPolling(t *testing.T) {
 	//this should not fail
 
 	err = polling.StartJob(api.JobInfo{
-		JobId:            1,
+		JobId:            "1",
 		Splits:           10,
 		SplitSize:        512,
 		MapBinSize:       512,

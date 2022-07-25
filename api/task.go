@@ -15,9 +15,9 @@ const (
 // in a MapReduce job, as well as the necessary information for a
 // remote executor to initialize itself and begin working.
 type Task struct {
-	JobId            int64
+	JobId            string
 	JobNumber        int
-	TaskId           int64
+	TaskId           string
 	Phase            Phase
 	BinID            uint
 	IntermediateBins uint
@@ -29,8 +29,8 @@ type Task struct {
 }
 
 type TaskResult struct {
-	TaskId int64 `json:"TaskId"` //Task identifier (used for polling Benchmarking)
-	JobId  int64 `json:"JobId"`  //Job identifier (used for polling Benchmarking)
+	TaskId string `json:"TaskId"` //Task identifier (used for polling Benchmarking)
+	JobId  string `json:"JobId"`  //Job identifier (used for polling Benchmarking)
 
 	BytesRead    int
 	BytesWritten int

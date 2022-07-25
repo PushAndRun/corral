@@ -40,18 +40,19 @@ func init() {
 
 // Driver controls the execution of a MapReduce Job
 type Driver struct {
-	jobs       []*Job
-	config     *config
-	executor   executor
-	cache      api.CacheSystem
-	polling    api.PollingStrategy
-	runtimeID  string
-	Start      time.Time
-	seed       int64
+	jobs      []*Job
+	config    *config
+	executor  executor
+	cache     api.CacheSystem
+	polling   api.PollingStrategy
+	runtimeID string
+	Start     time.Time
+
 	currentJob int
 	Runtime    time.Duration
 
-	lastOutputs []string
+	lastOutputs         []string
+	PrevJobBytesWritten int64
 }
 
 func (d *Driver) CurrentJob() *Job {
@@ -99,16 +100,14 @@ type Option func(*config)
 
 // NewDriver creates a new Driver with the provided job and optional configuration
 func NewDriver(job *Job, options ...Option) *Driver {
+
 	d := &Driver{
 		jobs:      []*Job{job},
 		executor:  &localExecutor{time.Now()},
 		runtimeID: randomName(),
 		Start:     time.Now(),
 		polling:   &polling.BackoffPolling{},
-		seed:      time.Now().UnixNano(),
 	}
-
-	rand.Seed(d.seed)
 
 	c := newConfig()
 	for _, f := range options {
@@ -507,18 +506,21 @@ func (d *Driver) run() {
 		*job.config = *d.config
 
 		err := d.polling.StartJob(api.JobInfo{
-			JobId:            job.JobId,
-			Splits:           len(inputs),
-			SplitSize:        d.config.SplitSize,
-			MapBinSize:       d.config.MapBinSize,
-			ReduceBinSize:    d.config.ReduceBinSize,
-			MaxConcurrency:   d.config.MaxConcurrency,
-			Backend:          d.config.Backend,
-			FunctionMemory:   viper.GetInt("lambdaMemory"),
-			CacheType:        viper.GetInt("cache"),
-			MapComplexity:    job.MapComplexity,
-			ReduceComplexity: job.ReduceComplexity,
-			TPCHQueryID:      job.TPCHQueryID,
+			JobId:               job.JobId,
+			Splits:              len(inputs),
+			SplitSize:           d.config.SplitSize,
+			MapBinSize:          d.config.MapBinSize,
+			ReduceBinSize:       d.config.ReduceBinSize,
+			MaxConcurrency:      d.config.MaxConcurrency,
+			Backend:             d.config.Backend,
+			FunctionMemory:      viper.GetInt("lambdaMemory"),
+			CacheType:           viper.GetInt("cache"),
+			MapComplexity:       job.MapComplexity,
+			ReduceComplexity:    job.ReduceComplexity,
+			TPCHQueryID:         job.TPCHQueryID,
+			NumberOfJobs:        len(d.jobs),
+			JobNumber:           idx,
+			PrevJobBytesWritten: d.PrevJobBytesWritten,
 			//d.getLOC("Map", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(6) + ".go")),
 			//d.getLOC("Reduce", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(6) + ".go")),
 		})
@@ -533,6 +535,7 @@ func (d *Driver) run() {
 		// Set inputs of next job to be outputs of current job
 		inputs = []string{job.fileSystem.Join(jobWorkingLoc, "output-*")}
 		d.lastOutputs = inputs
+		d.PrevJobBytesWritten = job.bytesWritten
 
 		log.Infof("Job %d - Total Bytes Read:\t%s", idx, humanize.Bytes(uint64(job.bytesRead)))
 		log.Infof("Job %d - Total Bytes Written:\t%s", idx, humanize.Bytes(uint64(job.bytesWritten)))
@@ -616,6 +619,11 @@ func (d *Driver) Execute() {
 	end := time.Now()
 	fmt.Printf("Job Execution Time: %s\n", end.Sub(start))
 	d.Runtime = end.Sub(start)
+	d.polling.JobUpdate(api.JobInfo{
+		JobId:         d.CurrentJob().JobId,
+		ExecutionTime: int64(d.Runtime * time.Nanosecond),
+	})
+
 }
 
 func (d *Driver) WithBackend(backendType *string) {
