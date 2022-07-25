@@ -25,6 +25,9 @@ type JobInfo struct {
 	//CacheType reference
 	CacheType int
 
+	MapBinSizes    map[int]int64
+	ReduceBinSizes map[int]int64
+
 	//estimated lines of code for the user defined map function
 	MapLOC int
 	//estimated lines of code for the user defined reduce function
@@ -66,6 +69,8 @@ type PollingStrategy interface {
 	*/
 	StartJob(JobInfo) error
 
+	//UpdateJob tasks a already exsisting JobInfo and overwrites data, e.g., for updating reduce split sizes.
+	UpdateJob(JobInfo) error
 	/*
 		TaskUpdate updates metadata related to a task. Usually called after a Polling
 		attempt.

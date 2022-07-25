@@ -2,9 +2,10 @@ package polling
 
 import (
 	"context"
+	"time"
+
 	"github.com/ISE-SMILE/corral/api"
 	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 type BackoffPolling struct {
@@ -14,6 +15,11 @@ type BackoffPolling struct {
 func (b *BackoffPolling) StartJob(info api.JobInfo) error {
 	log.Debug(info)
 	b.backoffCounter = make(map[string]int)
+	return nil
+}
+
+func (b *BackoffPolling) UpdateJob(info api.JobInfo) error {
+	log.Debug(info)
 	return nil
 }
 

@@ -3,7 +3,6 @@ package corral
 import (
 	"context"
 	"fmt"
-	"github.com/ISE-SMILE/corral/compute/polling"
 	"io"
 	"math"
 	"math/rand"
@@ -11,9 +10,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ISE-SMILE/corral/compute/polling"
 
 	"github.com/ISE-SMILE/corral/api"
 	"github.com/ISE-SMILE/corral/internal/corcache"
@@ -298,6 +300,7 @@ func (d *Driver) runMapPhase(job *Job, jobNumber int, inputs []string) {
 	log.Debugf("Number of job input splits: %d", len(inputSplits))
 
 	inputBins := packInputSplits(inputSplits, d.config.MapBinSize)
+	go d.collectMapMetrics(jobNumber, inputBins)
 	log.Debugf("Number of job input bins: %d", len(inputBins))
 	bar := pb.New(len(inputBins)).Prefix("Map").Start()
 
@@ -519,6 +522,9 @@ func (d *Driver) run() {
 		}
 
 		d.runMapPhase(job, idx, inputs)
+
+		go d.collectReducerMetrics(idx, job)
+
 		d.runReducePhase(job, idx)
 
 		// Set inputs of next job to be outputs of current job
@@ -552,6 +558,57 @@ func (d *Driver) run() {
 
 		job.done()
 	}
+}
+
+func (d *Driver) collectMapMetrics(jId int, inputs [][]api.InputSplit) {
+	if !viper.GetBool("collectInputSizes") {
+		return
+	}
+
+	binSizes := make(map[int]int64)
+	for bin, splits := range inputs {
+		for _, split := range splits {
+			binSizes[bin] += split.Size()
+		}
+	}
+	d.polling.UpdateJob(api.JobInfo{
+		JobId:       jId,
+		MapBinSizes: binSizes,
+	})
+}
+
+func (d *Driver) collectReducerMetrics(jId int, j *Job) {
+	if !viper.GetBool("collectInputSizes") {
+		return
+	}
+
+	var fs api.FileSystem = j.fileSystem
+	if j.cacheSystem != nil {
+		fs = j.cacheSystem
+	}
+
+	// Determine the intermediate data files this reducer is responsible for
+	path := fs.Join(j.outputPath, "map-bin%*")
+	files, err := fs.ListFiles(path)
+	if err != nil {
+		log.Debugf("failed to collect reduce metrics cause: %+v", err)
+	}
+
+	binSizes := make(map[int]int64)
+	for _, file := range files {
+		names := fs.Split(file.Name)
+
+		//("map-bin<binIdx>-<mapper>.out"
+		binStr := strings.Split(names[len(names)-1], "-")[1][3:]
+		binIdx, err := strconv.Atoi(binStr)
+		if err == nil {
+			binSizes[binIdx] += file.Size
+		}
+	}
+	d.polling.UpdateJob(api.JobInfo{
+		JobId:          jId,
+		ReduceBinSizes: binSizes,
+	})
 }
 
 var backendFlag = flag.StringP("backend", "b", "", "Define backend [local,lambda,whisk] - default local")
