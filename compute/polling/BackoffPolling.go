@@ -95,14 +95,21 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 		if _, ok := b.NumberOfPrematurePolls[info.RId]; ok {
 			val := b.taskInfos[info.TaskId]
 
+			//merge new information
 			mergo.MergeWithOverwrite(&val, api.TaskInfo{
 				NumberOfPrematurePolls: b.NumberOfPrematurePolls[info.RId],
 				FinalPollTime:          b.FinalPollTime[info.RId],
-				DeliveryLatency:        b.DeliveryLatency[info.RId],
-				PollLatency:            int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId]) - time.Nanosecond*time.Duration(info.ExecutionEnd)),
+				TotalDeliveryLatency:   b.DeliveryLatency[info.RId],
 				RId:                    info.RId,
 			}, mergo.WithTransformers(timeTransformer{}))
 			b.taskInfos[info.TaskId] = val
+
+			//compute additional statistics
+			if entry, ok := b.taskInfos[info.TaskId]; ok {
+				entry.PollLatency = int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId]) - time.Nanosecond*time.Duration(info.FunctionExecutionEnd))
+				entry.TotalExecutionTime = b.taskInfos[info.TaskId].RequestReceived.UnixNano() - b.taskInfos[info.TaskId].RequestStart.UnixNano()
+				b.taskInfos[info.TaskId] = entry
+			}
 
 			delete(b.backoffCounter, info.RId)
 			delete(b.NumberOfPrematurePolls, info.RId)

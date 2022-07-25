@@ -384,12 +384,12 @@ func (l *whiskExecutor) prepareWhiskResult(payload io.ReadCloser) (api.TaskResul
 		//JobNumber:         ids[0],
 		//BinId:             ids[2],
 		//Phase:             ids[1],
-		RequestReceived:   time.Now(),
-		ExecutionEnd:      result.EEnd,
-		ExecutionDuration: time.Nanosecond*time.Duration(result.EEnd) - time.Nanosecond*time.Duration(result.EStart),
-		RuntimeId:         result.CId,
-		Completed:         true,
-		Failed:            false,
+		RequestReceived:           time.Now(),
+		FunctionExecutionEnd:      result.EEnd,
+		FunctionExecutionDuration: int64(time.Duration(result.EEnd) - time.Duration(result.EStart)),
+		RuntimeId:                 result.CId,
+		Completed:                 true,
+		Failed:                    false,
 	})
 
 	return result, nil
@@ -791,11 +791,11 @@ func (l *whiskExecutor) WaitForBatch(activations *ActivationSet) ([]api.TaskResu
 							//JobNumber:         ids[0],
 							//BinId:             ids[2],
 							//Phase:             ids[1],
-							RequestReceived:   time.Now(),
-							ExecutionDuration: elat,
-							RuntimeId:         "",
-							Completed:         true,
-							RId:               activation.ActivationId,
+							RequestReceived:           time.Now(),
+							FunctionExecutionDuration: int64(elat),
+							RuntimeId:                 "",
+							Completed:                 true,
+							RId:                       activation.ActivationId,
 						})
 
 						activations.Remove(taskResult.RId)
