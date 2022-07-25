@@ -69,13 +69,15 @@ type TaskInfo struct {
 	RequestStart time.Time
 	//time the task was successfully polled by the backend
 	RequestReceived time.Time
+	//Total task execution duration including function execution duration and all latencies in ns
+	TotalExecutionTime int64
 
 	//time the task execution was completed
-	ExecutionEnd int64
-	//Duration of the task Execution
-	ExecutionDuration time.Duration
-	// Additional time to deliver the result
-	DeliveryLatency int64
+	FunctionExecutionEnd int64
+	//Duration of the function Execution
+	FunctionExecutionDuration int64
+	// Additional time to deliver the result in ms
+	TotalDeliveryLatency int64
 	//RuntimeId - semi unique identifier of the used execution runtime
 	RuntimeId string
 
