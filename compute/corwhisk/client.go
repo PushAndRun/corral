@@ -469,7 +469,7 @@ func (l *WhiskClient) tryInvoke(name string, invocation WhiskPayload) (io.ReadCl
 	for i := 0; i < MaxRetries; i++ {
 		rstart, fname, err := l.initInvoke(name, 1)
 		//change to false to switch from synchronous calls to polling only
-		invoke, response, err := l.Client.Actions.Invoke(fname, invocation, false, false)
+		invoke, response, err := l.Client.Actions.Invoke(fname, invocation, true, true)
 		rend := time.Now().UnixMilli()
 		log.Debugf("invoke %s took %d ms", fname, rend-rstart)
 		if response == nil && err != nil {

@@ -39,8 +39,11 @@ type JobInfo struct {
 	//estimated complexity e for the user defined reduce function (1,2,3)
 	ReduceComplexity ComplexityType
 
-	//execution time of the job
+	//execution time of the job without polling latency
 	ExecutionTime int64
+
+	//Text field to hold additional information about the experiment
+	ExperimentNote string
 
 	MapBinSizes    map[int]int64
 	ReduceBinSizes map[int]int64

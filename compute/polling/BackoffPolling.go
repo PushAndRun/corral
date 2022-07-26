@@ -111,7 +111,7 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 		//compute additional statistics
 		if entry, ok := b.taskInfos[info.TaskId]; ok {
 			entry.PollLatency = int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId]) - time.Nanosecond*time.Duration(info.FunctionExecutionEnd))
-			entry.TotalExecutionTime = entry.RequestCompletedAndPolled.UnixNano() - entry.RequestStart.UnixNano()
+			entry.TotalExecutionTime = entry.RequestCompletedAndPolled.UnixNano() - entry.RequestStart.UnixNano() - entry.PollLatency
 			entry.FunctionStartLatency = entry.FunctionExecutionStart - entry.RequestStart.UnixNano()
 
 			if entry.Phase == 0 {

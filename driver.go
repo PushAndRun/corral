@@ -76,6 +76,7 @@ type config struct {
 	Cache           api.CacheSystemType
 	Backend         string
 	Polling         api.PollingStrategy
+	ExperimentNote  string
 }
 
 func newConfig() *config {
@@ -93,6 +94,7 @@ func newConfig() *config {
 		MaxConcurrency:  viper.GetInt("maxConcurrency"),
 		WorkingLocation: viper.GetString("workingLocation"),
 		Cleanup:         viper.GetBool("cleanup"),
+		ExperimentNote:  viper.GetString("experimentNote"),
 	}
 }
 
@@ -240,6 +242,12 @@ func WithLambdaS3Backend(bucket, key string) Option {
 func WithBackoffPolling() Option {
 	return func(c *config) {
 		c.Polling = &polling.BackoffPolling{}
+	}
+}
+
+func SetExperimentNote(note string) Option {
+	return func(c *config) {
+		viper.Set("experimentNote", note)
 	}
 }
 
@@ -529,6 +537,7 @@ func (d *Driver) run() {
 			NumberOfJobs:        len(d.jobs),
 			JobNumber:           idx,
 			PrevJobBytesWritten: d.PrevJobBytesWritten,
+			ExperimentNote:      viper.GetString("experimentNote"),
 			//d.getLOC("Map", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(6) + ".go")),
 			//d.getLOC("Reduce", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(6) + ".go")),
 		})

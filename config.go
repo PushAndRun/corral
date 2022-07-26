@@ -1,9 +1,10 @@
 package corral
 
 import (
+	"time"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"time"
 )
 
 func loadConfig() {
@@ -52,6 +53,7 @@ func setupDefaults() {
 		"kubernetesNamespace":    "", //
 		"kubernetesStorageClass": "",
 		"redisPort":              nil,
+		"experimentNote":         "",
 	}
 	setupFlags(&defaultSettings)
 	for key, value := range defaultSettings {
