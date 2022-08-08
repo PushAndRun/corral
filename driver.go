@@ -240,10 +240,45 @@ func WithLambdaS3Backend(bucket, key string) Option {
 	}
 }
 
-func WithBackoffPolling() Option {
+func WithSquaredBackoffPolling() Option {
 	return func(c *config) {
 		c.Polling = &polling.SquaredBackoffPolling{}
 		c.PollingLabel = "SquaredBackoffPolling"
+	}
+}
+
+func WithExponentialBackoffPolling() Option {
+	return func(c *config) {
+		c.Polling = &polling.ExponentialBackoffPolling{}
+		c.PollingLabel = "ExponentialBackoffPolling"
+	}
+}
+
+func WithDuplicationBackoffPolling() Option {
+	return func(c *config) {
+		c.Polling = &polling.DuplicationBackoffPolling{}
+		c.PollingLabel = "DuplicationBackoffPolling"
+	}
+}
+
+func WithLinearBackoffPolling() Option {
+	return func(c *config) {
+		c.Polling = &polling.LinearBackoffPolling{}
+		c.PollingLabel = "LinearBackoffPolling"
+	}
+}
+
+func WithConstantPolling() Option {
+	return func(c *config) {
+		c.Polling = &polling.ConstantPolling{}
+		c.PollingLabel = "ConstantPolling"
+	}
+}
+
+func WithAveragePolling() Option {
+	return func(c *config) {
+		c.Polling = &polling.AveragePolling{}
+		c.PollingLabel = "AveragePolling"
 	}
 }
 

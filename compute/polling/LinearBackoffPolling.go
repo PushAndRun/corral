@@ -9,15 +9,15 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type SquaredBackoffPolling struct {
+type LinearBackoffPolling struct {
 	backoffCounter map[string]int
 	PollLogger
 }
 
-func (b *SquaredBackoffPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
+func (b *LinearBackoffPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
+	slope := 4
+	constant := 2
 	var backoff int
-	offset := 2
-	slope := 2
 
 	if b.backoffCounter == nil {
 		b.backoffCounter = make(map[string]int)
@@ -29,8 +29,13 @@ func (b *SquaredBackoffPolling) Poll(context context.Context, RId string) (<-cha
 		b.NumberOfPrematurePolls[RId] = 1
 	}
 
-	backoff = slope*(b.NumberOfPrematurePolls[RId]*b.NumberOfPrematurePolls[RId]) + offset
-
+	if last, ok := b.backoffCounter[RId]; ok {
+		b.backoffCounter[RId] = last + slope
+		backoff = last
+	} else {
+		backoff = constant
+		b.backoffCounter[RId] = backoff
+	}
 	log.Debugf("Poll backoff %s for %d seconds", RId, backoff)
 	channel := make(chan interface{})
 	go func() {
@@ -44,7 +49,7 @@ func (b *SquaredBackoffPolling) Poll(context context.Context, RId string) (<-cha
 	return channel, nil
 }
 
-func (b *SquaredBackoffPolling) TaskUpdate(info api.TaskInfo) error {
+func (b *LinearBackoffPolling) TaskUpdate(info api.TaskInfo) error {
 	if info.Failed || info.Completed {
 		delete(b.backoffCounter, info.RId)
 		return b.PollLogger.TaskUpdate(info)
