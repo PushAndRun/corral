@@ -1,0 +1,16 @@
+SELECT DISTINCT tpch_query_id, 
+            split_size, map_bin_size, reduce_bin_size, 
+            sum(fed) as total_function_execution_time,   
+            sum(tet) as total_execution_time, 
+            sum(number_of_tasks) as number_of_tasks
+FROM obs2 o
+JOIN (SELECT DISTINCT job_id, count(task_id) as number_of_tasks,
+             sum(function_execution_duration) as fed,   
+            sum(total_execution_time) as tet
+    FROM obs2
+     GROUP BY job_id) as gj  ON gj.job_id = o.job_id
+     
+     GROUP BY tpch_query_id, split_size, map_bin_size, reduce_bin_size
+ORDER BY total_function_execution_time
+
+

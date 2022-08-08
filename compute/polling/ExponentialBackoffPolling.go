@@ -15,6 +15,7 @@ type ExponentialBackoffPolling struct {
 }
 
 func (b *ExponentialBackoffPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
+	predictionStartTime := time.Now().UnixNano()
 	var backoff int
 
 	if b.backoffCounter == nil {
@@ -33,6 +34,14 @@ func (b *ExponentialBackoffPolling) Poll(context context.Context, RId string) (<
 	} else {
 		backoff = 2
 		b.backoffCounter[RId] = backoff
+	}
+
+	predictionEndTime := time.Now().UnixNano()
+
+	if _, ok := b.PollPredictionTimes[RId]; ok {
+		b.PollPredictionTimes[RId] += (predictionEndTime - predictionStartTime)
+	} else {
+		b.PollPredictionTimes[RId] = (predictionEndTime - predictionStartTime)
 	}
 	log.Debugf("Poll backoff %s for %d seconds", RId, backoff)
 	channel := make(chan interface{})

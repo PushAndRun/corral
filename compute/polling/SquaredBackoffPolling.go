@@ -15,6 +15,7 @@ type SquaredBackoffPolling struct {
 }
 
 func (b *SquaredBackoffPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
+	predictionStartTime := time.Now().UnixNano()
 	var backoff int
 	offset := 2
 	slope := 2
@@ -30,6 +31,14 @@ func (b *SquaredBackoffPolling) Poll(context context.Context, RId string) (<-cha
 	}
 
 	backoff = slope*(b.NumberOfPrematurePolls[RId]*b.NumberOfPrematurePolls[RId]) + offset
+
+	predictionEndTime := time.Now().UnixNano()
+
+	if _, ok := b.PollPredictionTimes[RId]; ok {
+		b.PollPredictionTimes[RId] += (predictionEndTime - predictionStartTime)
+	} else {
+		b.PollPredictionTimes[RId] = (predictionEndTime - predictionStartTime)
+	}
 
 	log.Debugf("Poll backoff %s for %d seconds", RId, backoff)
 	channel := make(chan interface{})

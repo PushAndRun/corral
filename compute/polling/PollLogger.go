@@ -25,14 +25,17 @@ type PollLogger struct {
 
 	NumberOfPrematurePolls map[string]int
 	FinalPollTime          map[string]int64
-	PollingLabel           string
-	TaskMapMutex           sync.RWMutex
+	PollPredictionTimes    map[string]int64
+
+	PollingLabel string
+	TaskMapMutex sync.RWMutex
 }
 
 func (b *PollLogger) StartJob(info api.JobInfo) error {
 	log.Debug(info)
 	b.NumberOfPrematurePolls = make(map[string]int)
 	b.FinalPollTime = make(map[string]int64)
+	b.PollPredictionTimes = make(map[string]int64)
 
 	b.TaskMapMutex = sync.RWMutex{}
 
@@ -84,6 +87,7 @@ func (b *PollLogger) TaskUpdate(info api.TaskInfo) error {
 			NumberOfPrematurePolls: b.NumberOfPrematurePolls[info.RId],
 			FinalPollTime:          b.FinalPollTime[info.RId],
 			RId:                    info.RId,
+			PollCalculationTime:    b.PollPredictionTimes[info.RId],
 		}, mergo.WithTransformers(&timeTransformer{}))
 		b.taskInfos[info.TaskId] = val
 

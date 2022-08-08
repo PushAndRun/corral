@@ -85,6 +85,8 @@ type TaskInfo struct {
 	FunctionExecutionDuration int64
 	// Latency between task completion and final poll in ns
 	PollLatency int64
+	// Time that was reqiuired to calculate the polling prediction or backoff
+	PollCalculationTime int64
 
 	//Number of premature Polls for this task
 	NumberOfPrematurePolls int
