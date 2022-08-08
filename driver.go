@@ -76,6 +76,7 @@ type config struct {
 	Cache           api.CacheSystemType
 	Backend         string
 	Polling         api.PollingStrategy
+	PollingLabel    string
 	ExperimentNote  string
 }
 
@@ -109,7 +110,7 @@ func NewDriver(job *Job, options ...Option) *Driver {
 		executor:  &localExecutor{time.Now()},
 		runtimeID: randomName(),
 		Start:     time.Now(),
-		polling:   &polling.BackoffPolling{},
+		polling:   &polling.SquaredBackoffPolling{},
 	}
 
 	c := newConfig()
@@ -241,7 +242,8 @@ func WithLambdaS3Backend(bucket, key string) Option {
 
 func WithBackoffPolling() Option {
 	return func(c *config) {
-		c.Polling = &polling.BackoffPolling{}
+		c.Polling = &polling.SquaredBackoffPolling{}
+		c.PollingLabel = "SquaredBackoffPolling"
 	}
 }
 
@@ -402,9 +404,6 @@ func (d *Driver) runReducePhase(job *Job, jobNumber int) {
 		wg.Wait()
 	}
 	bar.Finish()
-	if viper.GetBool("verbose") || *verbose {
-		d.polling.Finalize()
-	}
 }
 
 func RunningOnCloudPlatfrom() bool {
@@ -537,6 +536,7 @@ func (d *Driver) run() {
 			NumberOfJobs:        len(d.jobs),
 			JobNumber:           idx,
 			PrevJobBytesWritten: d.PrevJobBytesWritten,
+			PollingStrategy:     d.config.PollingLabel,
 			ExperimentNote:      viper.GetString("experimentNote"),
 			//d.getLOC("Map", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(6) + ".go")),
 			//d.getLOC("Reduce", ("../corral-tpc-h-main/queries/q" + strconv.Itoa(6) + ".go")),
@@ -692,9 +692,12 @@ func (d *Driver) Execute() {
 	fmt.Printf("Job Execution Time: %s\n", end.Sub(start))
 	d.Runtime = end.Sub(start)
 	d.polling.JobUpdate(api.JobInfo{
-		JobId:         d.CurrentJob().JobId,
-		ExecutionTime: int64(d.Runtime * time.Nanosecond),
+		JobId:              d.CurrentJob().JobId,
+		StageExecutionTime: int64(d.Runtime * time.Nanosecond),
 	})
+	if viper.GetBool("verbose") || *verbose {
+		d.polling.Finalize()
+	}
 
 }
 

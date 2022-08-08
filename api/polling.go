@@ -39,8 +39,8 @@ type JobInfo struct {
 	//estimated complexity e for the user defined reduce function (1,2,3)
 	ReduceComplexity ComplexityType
 
-	//execution time of the job without polling latency
-	ExecutionTime int64
+	//execution time of the stage
+	StageExecutionTime int64
 
 	//Text field to hold additional information about the experiment
 	ExperimentNote string
@@ -77,7 +77,7 @@ type TaskInfo struct {
 	//Size of the Bin
 	BinSize int64
 
-	//Total task execution duration including function execution duration and all latencies in ns
+	//Total task execution duration without polling latency in ns
 	TotalExecutionTime int64
 	//Time span from request start to function start
 	FunctionStartLatency int64
@@ -107,6 +107,7 @@ type TaskInfo struct {
 }
 
 type PollingStrategy interface {
+
 	/*StartJob initializes a Job, all subsequent TaskUpdates are treated
 	  as related to this Job. Calling StartJob again indicates the start of a
 	  new job and the end of the last job.

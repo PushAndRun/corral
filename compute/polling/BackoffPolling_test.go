@@ -11,7 +11,7 @@ import (
 
 func TestBackoffPolling(t *testing.T) {
 	ctx := context.Background()
-	polling := &BackoffPolling{}
+	polling := &SquaredBackoffPolling{}
 	polling.StartJob(api.JobInfo{
 		JobId:            "1",
 		Splits:           10,

@@ -2,6 +2,13 @@ package corral
 
 import (
 	"encoding/json"
+	"io"
+	"io/ioutil"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/ISE-SMILE/corral/api"
 	"github.com/ISE-SMILE/corral/compute/build"
 	"github.com/ISE-SMILE/corral/compute/corwhisk"
@@ -9,12 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"io"
-	"io/ioutil"
-	"os"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestRunningInWhisk(t *testing.T) {
@@ -86,7 +87,7 @@ func TestRunWhiskMapper(t *testing.T) {
 	executor := &whiskExecutor{
 		mock,
 		"FunctionName",
-		&polling.BackoffPolling{},
+		&polling.SquaredBackoffPolling{},
 	}
 
 	job := &Job{
@@ -108,7 +109,7 @@ func TestRunWhiskReducer(t *testing.T) {
 	executor := &whiskExecutor{
 		mock,
 		"FunctionName",
-		&polling.BackoffPolling{},
+		&polling.SquaredBackoffPolling{},
 	}
 
 	job := &Job{
@@ -130,7 +131,7 @@ func TestRunWhiskDeployFunction(t *testing.T) {
 	executor := &whiskExecutor{
 		mock,
 		"FunctionName",
-		&polling.BackoffPolling{},
+		&polling.SquaredBackoffPolling{},
 	}
 
 	viper.SetDefault("lambdaManageRole", false) // Disable testing role deployment

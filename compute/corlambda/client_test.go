@@ -1,8 +1,9 @@
 package corlambda
 
 import (
-	"github.com/ISE-SMILE/corral/compute/polling"
 	"testing"
+
+	"github.com/ISE-SMILE/corral/compute/polling"
 
 	"github.com/aws/aws-sdk-go/service/lambda/lambdaiface"
 
@@ -99,7 +100,7 @@ func TestInvoke(t *testing.T) {
 			invokeFailures: 0,
 			outputPayload:  []byte("payload"),
 		},
-		&polling.BackoffPolling{},
+		&polling.SquaredBackoffPolling{},
 	}
 
 	output, err := client.Invoke("function", []byte("payload"))
@@ -114,7 +115,7 @@ func TestInvokeRetry(t *testing.T) {
 			invokeFailures: 2,
 			outputPayload:  []byte("payload"),
 		},
-		&polling.BackoffPolling{},
+		&polling.SquaredBackoffPolling{},
 	}
 
 	output, err := client.Invoke("function", []byte("payload"))
@@ -128,7 +129,7 @@ func TestInvokeOutOfTries(t *testing.T) {
 		&lambdaInvokerMock{
 			invokeFailures: MaxLambdaRetries + 1,
 		},
-		&polling.BackoffPolling{},
+		&polling.SquaredBackoffPolling{},
 	}
 
 	_, err := client.Invoke("function", []byte("payload"))
@@ -137,7 +138,7 @@ func TestInvokeOutOfTries(t *testing.T) {
 
 func TestCreateFunction(t *testing.T) {
 	mock := &lambdaDeployMock{}
-	client := &LambdaClient{mock, &polling.BackoffPolling{}}
+	client := &LambdaClient{mock, &polling.SquaredBackoffPolling{}}
 
 	config := &FunctionConfig{
 		FunctionDeployment: lambdaMockDeploymentPackage{},
@@ -167,7 +168,7 @@ func TestUpdateFunction(t *testing.T) {
 			},
 		},
 	}
-	client := &LambdaClient{mock, &polling.BackoffPolling{}}
+	client := &LambdaClient{mock, &polling.SquaredBackoffPolling{}}
 
 	config := &FunctionConfig{
 		FunctionDeployment: lambdaMockDeploymentPackage{true},
@@ -189,7 +190,7 @@ func TestUpdateFunction(t *testing.T) {
 func TestDeleteFunction(t *testing.T) {
 	mock := &lambdaDeployMock{}
 
-	client := &LambdaClient{mock, &polling.BackoffPolling{}}
+	client := &LambdaClient{mock, &polling.SquaredBackoffPolling{}}
 
 	err := client.DeleteFunction("function")
 	assert.Nil(t, err)

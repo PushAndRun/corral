@@ -2,57 +2,35 @@ package polling
 
 import (
 	"bufio"
-	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"sync"
 	"time"
+
+	"github.com/imdario/mergo"
 
 	struct2csv "github.com/dnlo/struct2csv"
 
 	"github.com/ISE-SMILE/corral/api"
-	"github.com/imdario/mergo"
+
 	log "github.com/sirupsen/logrus"
 )
 
-//Transformer is an addition from https://pkg.go.dev/github.com/imdario/mergo@v0.3.13 and supplements mergo with a handling for zero time stamps
-type timeTransformer struct {
-}
-
-func (t timeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
-	if typ == reflect.TypeOf(time.Time{}) {
-		return func(dst, src reflect.Value) error {
-			if dst.CanSet() {
-				isZero := dst.MethodByName("IsZero")
-				result := isZero.Call([]reflect.Value{})
-				if result[0].Bool() {
-					dst.Set(src)
-				}
-			}
-			return nil
-		}
-	}
-	return nil
-}
-
-type BackoffPolling struct {
+type PollLogger struct {
 	//Maps to hold the task and job infos for measuring the polling performance
-	taskInfos              map[string]api.TaskInfo
-	jobInfos               map[string]api.JobInfo
-	backoffCounter         map[string]int
+	taskInfos map[string]api.TaskInfo
+	jobInfos  map[string]api.JobInfo
+
 	NumberOfPrematurePolls map[string]int
 	FinalPollTime          map[string]int64
-
-	TaskMapMutex sync.RWMutex
+	PollingLabel           string
+	TaskMapMutex           sync.RWMutex
 }
 
-func (b *BackoffPolling) StartJob(info api.JobInfo) error {
+func (b *PollLogger) StartJob(info api.JobInfo) error {
 	log.Debug(info)
-	info.PollingStrategy = "BackoffPolling"
-	b.backoffCounter = make(map[string]int)
 	b.NumberOfPrematurePolls = make(map[string]int)
 	b.FinalPollTime = make(map[string]int64)
 
@@ -70,10 +48,11 @@ func (b *BackoffPolling) StartJob(info api.JobInfo) error {
 	return nil
 }
 
-func (b *BackoffPolling) JobUpdate(info api.JobInfo) error {
+func (b *PollLogger) JobUpdate(info api.JobInfo) error {
+
 	if val, ok := b.jobInfos[fmt.Sprint(info.JobId)]; ok {
 		//update entry
-		mergo.MergeWithOverwrite(&val, info, mergo.WithTransformers(timeTransformer{}))
+		mergo.MergeWithOverwrite(&val, info, mergo.WithTransformers(&timeTransformer{}))
 		b.jobInfos[fmt.Sprint(info.JobId)] = val
 	} else {
 		//create entry
@@ -82,13 +61,13 @@ func (b *BackoffPolling) JobUpdate(info api.JobInfo) error {
 	return nil
 }
 
-func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
+func (b *PollLogger) TaskUpdate(info api.TaskInfo) error {
 	log.Info("TaskUpdate called with: " + fmt.Sprint(info))
 
 	b.TaskMapMutex.Lock()
 	if val, ok := b.taskInfos[fmt.Sprint(info.TaskId)]; ok {
 		//update entry
-		mergo.MergeWithOverwrite(&val, info, mergo.WithTransformers(timeTransformer{}))
+		mergo.MergeWithOverwrite(&val, info, mergo.WithTransformers(&timeTransformer{}))
 		b.taskInfos[fmt.Sprint(info.TaskId)] = val
 	} else {
 		//create entry
@@ -105,13 +84,19 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 			NumberOfPrematurePolls: b.NumberOfPrematurePolls[info.RId],
 			FinalPollTime:          b.FinalPollTime[info.RId],
 			RId:                    info.RId,
-		}, mergo.WithTransformers(timeTransformer{}))
+		}, mergo.WithTransformers(&timeTransformer{}))
 		b.taskInfos[info.TaskId] = val
 
 		//compute additional statistics
 		if entry, ok := b.taskInfos[info.TaskId]; ok {
-			entry.PollLatency = int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId]) - time.Nanosecond*time.Duration(info.FunctionExecutionEnd))
-			entry.TotalExecutionTime = entry.RequestCompletedAndPolled.UnixNano() - entry.RequestStart.UnixNano() - entry.PollLatency
+
+			if int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId])-time.Nanosecond*time.Duration(info.FunctionExecutionEnd)) > 0 {
+				entry.PollLatency = int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId]) - time.Nanosecond*time.Duration(info.FunctionExecutionEnd))
+				entry.TotalExecutionTime = entry.RequestCompletedAndPolled.UnixNano() - entry.RequestStart.UnixNano() - entry.PollLatency
+			} else {
+				entry.TotalExecutionTime = entry.RequestCompletedAndPolled.UnixNano() - entry.RequestStart.UnixNano()
+			}
+
 			entry.FunctionStartLatency = entry.FunctionExecutionStart - entry.RequestStart.UnixNano()
 
 			if entry.Phase == 0 {
@@ -133,7 +118,6 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 
 		b.TaskMapMutex.Unlock()
 
-		delete(b.backoffCounter, info.RId)
 		delete(b.NumberOfPrematurePolls, info.RId)
 		delete(b.FinalPollTime, info.RId)
 	}
@@ -141,40 +125,11 @@ func (b *BackoffPolling) TaskUpdate(info api.TaskInfo) error {
 	return nil
 }
 
-func (b *BackoffPolling) SetFinalPollTime(RId string, timeNano int64) {
+func (b *PollLogger) SetFinalPollTime(RId string, timeNano int64) {
 	b.FinalPollTime[RId] = timeNano
 }
 
-func (b *BackoffPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
-	var backoff int
-
-	if polls, ok := b.NumberOfPrematurePolls[RId]; ok {
-		b.NumberOfPrematurePolls[RId] = polls + 1
-	} else {
-		b.NumberOfPrematurePolls[RId] = 1
-	}
-
-	if last, ok := b.backoffCounter[RId]; ok {
-		b.backoffCounter[RId] = backoff * backoff
-		backoff = last
-	} else {
-		backoff = 4
-		b.backoffCounter[RId] = backoff
-	}
-	log.Debugf("Poll backoff %s for %d seconds", RId, backoff)
-	channel := make(chan interface{})
-	go func() {
-		select {
-		case <-context.Done():
-			channel <- struct{}{}
-		case <-time.After(time.Second * time.Duration(backoff)):
-			channel <- struct{}{}
-		}
-	}()
-	return channel, nil
-}
-
-func (b *BackoffPolling) Finalize() error {
+func (b *PollLogger) Finalize() error {
 
 	err := b.jobLogWriter("jobLog", b.jobInfos)
 	if err != nil {
@@ -185,7 +140,7 @@ func (b *BackoffPolling) Finalize() error {
 	return err
 }
 
-func (b *BackoffPolling) jobLogWriter(logName string, logStruct map[string]api.JobInfo) error {
+func (b *PollLogger) jobLogWriter(logName string, logStruct map[string]api.JobInfo) error {
 
 	logFile, err := os.OpenFile(logName+".csv", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 
@@ -241,7 +196,7 @@ func (b *BackoffPolling) jobLogWriter(logName string, logStruct map[string]api.J
 	return err
 }
 
-func (b *BackoffPolling) taskLogWriter(logName string, logStruct map[string]api.TaskInfo) error {
+func (b *PollLogger) taskLogWriter(logName string, logStruct map[string]api.TaskInfo) error {
 
 	logFile, err := os.OpenFile(logName+".csv", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 
