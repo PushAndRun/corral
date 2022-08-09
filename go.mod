@@ -41,6 +41,8 @@ require (
 	google.golang.org/protobuf v1.28.0
 )
 
+require github.com/tensorflow/tensorflow v1.15.0 // indirect
+
 require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cloudfoundry/jibber_jabber v0.0.0-20151120183258-bcc4c8345a21 // indirect

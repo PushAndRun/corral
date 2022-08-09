@@ -32,7 +32,7 @@ func (b *ExponentialBackoffPolling) Poll(context context.Context, RId string) (<
 		b.backoffCounter[RId] = last * last
 		backoff = last
 	} else {
-		backoff = 2
+		backoff = 4
 		b.backoffCounter[RId] = backoff
 	}
 

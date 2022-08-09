@@ -282,6 +282,13 @@ func WithAveragePolling() Option {
 	}
 }
 
+func WithMovingAveragePolling() Option {
+	return func(c *config) {
+		c.Polling = &polling.MovingAveragePolling{}
+		c.PollingLabel = "MovingAveragePolling"
+	}
+}
+
 func SetExperimentNote(note string) Option {
 	return func(c *config) {
 		viper.Set("experimentNote", note)

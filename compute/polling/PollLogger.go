@@ -27,8 +27,10 @@ type PollLogger struct {
 	FinalPollTime          map[string]int64
 	PollPredictionTimes    map[string]int64
 
-	PollingLabel string
-	TaskMapMutex sync.RWMutex
+	PollingLabel  string
+	TaskMapMutex  sync.RWMutex
+	MapMutex      sync.RWMutex
+	PollTimeMutex sync.RWMutex
 }
 
 func (b *PollLogger) StartJob(info api.JobInfo) error {
@@ -38,6 +40,8 @@ func (b *PollLogger) StartJob(info api.JobInfo) error {
 	b.PollPredictionTimes = make(map[string]int64)
 
 	b.TaskMapMutex = sync.RWMutex{}
+	b.PollTimeMutex = sync.RWMutex{}
+	b.MapMutex = sync.RWMutex{}
 
 	if b.taskInfos == nil {
 		b.taskInfos = make(map[string]api.TaskInfo)
@@ -130,7 +134,9 @@ func (b *PollLogger) TaskUpdate(info api.TaskInfo) error {
 }
 
 func (b *PollLogger) SetFinalPollTime(RId string, timeNano int64) {
+	b.PollTimeMutex.Lock()
 	b.FinalPollTime[RId] = timeNano
+	b.PollTimeMutex.Unlock()
 }
 
 func (b *PollLogger) Finalize() error {
