@@ -26,11 +26,14 @@ type PollLogger struct {
 	NumberOfPrematurePolls map[string]int
 	FinalPollTime          map[string]int64
 	PollPredictionTimes    map[string]int64
+	ExecutionTimes         []int
 
-	PollingLabel  string
-	TaskMapMutex  sync.RWMutex
-	MapMutex      sync.RWMutex
-	PollTimeMutex sync.RWMutex
+	PollingLabel            string
+	TaskMapMutex            sync.RWMutex
+	PrematurePollMutex      sync.RWMutex
+	PollTimeMutex           sync.RWMutex
+	PolledTaskMutex         sync.RWMutex
+	PollPredictionTimeMutex sync.Mutex
 }
 
 func (b *PollLogger) StartJob(info api.JobInfo) error {
@@ -38,10 +41,14 @@ func (b *PollLogger) StartJob(info api.JobInfo) error {
 	b.NumberOfPrematurePolls = make(map[string]int)
 	b.FinalPollTime = make(map[string]int64)
 	b.PollPredictionTimes = make(map[string]int64)
+	b.ExecutionTimes = make([]int, 1)
+	b.ExecutionTimes[0] = 16
 
 	b.TaskMapMutex = sync.RWMutex{}
 	b.PollTimeMutex = sync.RWMutex{}
-	b.MapMutex = sync.RWMutex{}
+	b.PrematurePollMutex = sync.RWMutex{}
+	b.PolledTaskMutex = sync.RWMutex{}
+	b.PollPredictionTimeMutex = sync.Mutex{}
 
 	if b.taskInfos == nil {
 		b.taskInfos = make(map[string]api.TaskInfo)
@@ -87,6 +94,7 @@ func (b *PollLogger) TaskUpdate(info api.TaskInfo) error {
 
 		val := b.taskInfos[info.TaskId]
 		//merge new information
+		b.PollTimeMutex.Lock()
 		mergo.MergeWithOverwrite(&val, api.TaskInfo{
 			NumberOfPrematurePolls: b.NumberOfPrematurePolls[info.RId],
 			FinalPollTime:          b.FinalPollTime[info.RId],
@@ -94,17 +102,18 @@ func (b *PollLogger) TaskUpdate(info api.TaskInfo) error {
 			PollCalculationTime:    b.PollPredictionTimes[info.RId],
 		}, mergo.WithTransformers(&timeTransformer{}))
 		b.taskInfos[info.TaskId] = val
+		b.PollTimeMutex.Unlock()
 
 		//compute additional statistics
 		if entry, ok := b.taskInfos[info.TaskId]; ok {
-
+			b.PollTimeMutex.Lock()
 			if int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId])-time.Nanosecond*time.Duration(info.FunctionExecutionEnd)) > 0 {
 				entry.PollLatency = int64(time.Nanosecond*time.Duration(b.FinalPollTime[info.RId]) - time.Nanosecond*time.Duration(info.FunctionExecutionEnd))
 				entry.TotalExecutionTime = entry.RequestCompletedAndPolled.UnixNano() - entry.RequestStart.UnixNano() - entry.PollLatency
 			} else {
 				entry.TotalExecutionTime = entry.RequestCompletedAndPolled.UnixNano() - entry.RequestStart.UnixNano()
 			}
-
+			b.PollTimeMutex.Unlock()
 			entry.FunctionStartLatency = entry.FunctionExecutionStart - entry.RequestStart.UnixNano()
 
 			if entry.Phase == 0 {
@@ -119,7 +128,7 @@ func (b *PollLogger) TaskUpdate(info api.TaskInfo) error {
 					entry.BinSize = job.ReduceBinSizes[entry.BinId]
 				}
 			}
-
+			b.ExecutionTimes = append(b.ExecutionTimes, int(entry.TotalExecutionTime/1000000000))
 			b.taskInfos[info.TaskId] = entry
 
 		}
@@ -127,7 +136,9 @@ func (b *PollLogger) TaskUpdate(info api.TaskInfo) error {
 		b.TaskMapMutex.Unlock()
 
 		delete(b.NumberOfPrematurePolls, info.RId)
+		b.PollTimeMutex.Lock()
 		delete(b.FinalPollTime, info.RId)
+		b.PollTimeMutex.Unlock()
 	}
 
 	return nil

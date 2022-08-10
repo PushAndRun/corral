@@ -77,7 +77,7 @@ type TaskInfo struct {
 	//Size of the Bin
 	BinSize int64
 
-	//Total task execution duration without polling latency in ns
+	//Total task execution duration
 	TotalExecutionTime int64
 	//Time span from request start to function start
 	FunctionStartLatency int64

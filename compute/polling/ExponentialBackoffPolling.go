@@ -37,12 +37,14 @@ func (b *ExponentialBackoffPolling) Poll(context context.Context, RId string) (<
 	}
 
 	predictionEndTime := time.Now().UnixNano()
-
+	b.PollPredictionTimeMutex.Lock()
 	if _, ok := b.PollPredictionTimes[RId]; ok {
 		b.PollPredictionTimes[RId] += (predictionEndTime - predictionStartTime)
 	} else {
 		b.PollPredictionTimes[RId] = (predictionEndTime - predictionStartTime)
 	}
+	b.PollPredictionTimeMutex.Unlock()
+
 	log.Debugf("Poll backoff %s for %d seconds", RId, backoff)
 	channel := make(chan interface{})
 	go func() {
