@@ -41,7 +41,11 @@ require (
 	google.golang.org/protobuf v1.28.0
 )
 
-require github.com/tensorflow/tensorflow v1.15.0 // indirect
+require (
+	github.com/galeone/tensorflow/tensorflow/go v0.0.0-20220620094824-6bb01e3a58fa // indirect
+	github.com/galeone/tfgo v0.0.0-20220622151904-fc7b7ccad83b // indirect
+	github.com/tensorflow/tensorflow v1.15.0 // indirect
+)
 
 require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect

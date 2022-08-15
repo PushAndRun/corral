@@ -37,6 +37,7 @@ func (b *AveragePolling) Poll(context context.Context, RId string) (<-chan inter
 	if present, ok := b.PolledTasks[RId]; ok && present {
 		b.PolledTaskMutex.Unlock()
 		//we dont want to use the average again... fall back to dup.-backoff
+		b.BackoffCounterMutex.Lock()
 		if b.backoffCounter == nil {
 			b.backoffCounter = make(map[string]int)
 		}
@@ -46,12 +47,13 @@ func (b *AveragePolling) Poll(context context.Context, RId string) (<-chan inter
 			backoff = last
 		} else {
 			backoff = 16
-			b.backoffCounter[RId] = backoff
+			b.backoffCounter[RId] = backoff + backoff
 		}
+		b.BackoffCounterMutex.Unlock()
 		log.Println("Use the fallback")
 
 	} else {
-		b.PolledTaskMutex.Unlock()
+
 		//get the average
 
 		var sum int
@@ -61,7 +63,7 @@ func (b *AveragePolling) Poll(context context.Context, RId string) (<-chan inter
 		backoff = int(sum/len(b.ExecutionTimes)) + timebuffer
 		log.Println("Use the average")
 		b.PolledTasks[RId] = true
-
+		b.PolledTaskMutex.Unlock()
 	}
 
 	predictionEndTime := time.Now().UnixNano()

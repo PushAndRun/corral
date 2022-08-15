@@ -46,11 +46,11 @@ func (b *MovingAveragePolling) Poll(context context.Context, RId string) (<-chan
 			backoff = last
 		} else {
 			backoff = 16
-			b.backoffCounter[RId] = backoff
+			b.backoffCounter[RId] = backoff + backoff
 		}
 
 	} else {
-		b.PolledTaskMutex.Unlock()
+
 		//get the average
 
 		var sum int
@@ -71,6 +71,7 @@ func (b *MovingAveragePolling) Poll(context context.Context, RId string) (<-chan
 		log.Println("Use the average")
 
 		b.PolledTasks[RId] = true
+		b.PolledTaskMutex.Unlock()
 
 	}
 

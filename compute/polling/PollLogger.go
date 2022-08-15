@@ -34,6 +34,7 @@ type PollLogger struct {
 	PollTimeMutex           sync.RWMutex
 	PolledTaskMutex         sync.RWMutex
 	PollPredictionTimeMutex sync.Mutex
+	BackoffCounterMutex     sync.Mutex
 }
 
 func (b *PollLogger) StartJob(info api.JobInfo) error {
@@ -49,6 +50,7 @@ func (b *PollLogger) StartJob(info api.JobInfo) error {
 	b.PrematurePollMutex = sync.RWMutex{}
 	b.PolledTaskMutex = sync.RWMutex{}
 	b.PollPredictionTimeMutex = sync.Mutex{}
+	b.BackoffCounterMutex = sync.Mutex{}
 
 	if b.taskInfos == nil {
 		b.taskInfos = make(map[string]api.TaskInfo)
@@ -128,7 +130,12 @@ func (b *PollLogger) TaskUpdate(info api.TaskInfo) error {
 					entry.BinSize = job.ReduceBinSizes[entry.BinId]
 				}
 			}
-			b.ExecutionTimes = append(b.ExecutionTimes, int(entry.TotalExecutionTime/1000000000))
+
+			executionTimeInSeconds := int(entry.TotalExecutionTime / 1000000000)
+			if executionTimeInSeconds > 0 && executionTimeInSeconds < 500 {
+				b.ExecutionTimes = append(b.ExecutionTimes, executionTimeInSeconds)
+			}
+
 			b.taskInfos[info.TaskId] = entry
 
 		}

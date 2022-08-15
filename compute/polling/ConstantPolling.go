@@ -15,11 +15,13 @@ func (b *ConstantPolling) Poll(context context.Context, RId string) (<-chan inte
 	predictionStartTime := time.Now().UnixNano()
 	timer := 10
 
+	b.PrematurePollMutex.Lock()
 	if polls, ok := b.NumberOfPrematurePolls[RId]; ok {
 		b.NumberOfPrematurePolls[RId] = polls + 1
 	} else {
 		b.NumberOfPrematurePolls[RId] = 1
 	}
+	b.PrematurePollMutex.Unlock()
 
 	predictionEndTime := time.Now().UnixNano()
 	b.PollPredictionTimeMutex.Lock()
@@ -30,6 +32,7 @@ func (b *ConstantPolling) Poll(context context.Context, RId string) (<-chan inte
 	}
 	b.PollPredictionTimeMutex.Unlock()
 	log.Debugf("Poll %s again after %d seconds", RId, timer)
+
 	channel := make(chan interface{})
 	go func() {
 		select {

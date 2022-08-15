@@ -26,7 +26,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const MaxPullRetries = 30
+const MaxPullRetries = 40
 
 type WhiskClient struct {
 	Client           *whisk.Client

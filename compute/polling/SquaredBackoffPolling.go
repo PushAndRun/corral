@@ -4,13 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/ISE-SMILE/corral/api"
-
 	log "github.com/sirupsen/logrus"
 )
 
 type SquaredBackoffPolling struct {
-	backoffCounter map[string]int
 	PollLogger
 }
 
@@ -20,15 +17,13 @@ func (b *SquaredBackoffPolling) Poll(context context.Context, RId string) (<-cha
 	offset := 2
 	slope := 2
 
-	if b.backoffCounter == nil {
-		b.backoffCounter = make(map[string]int)
-	}
-
+	b.PrematurePollMutex.Lock()
 	if polls, ok := b.NumberOfPrematurePolls[RId]; ok {
 		b.NumberOfPrematurePolls[RId] = polls + 1
 	} else {
 		b.NumberOfPrematurePolls[RId] = 1
 	}
+	b.PrematurePollMutex.Unlock()
 
 	backoff = slope*(b.NumberOfPrematurePolls[RId]*b.NumberOfPrematurePolls[RId]) + offset
 
@@ -51,13 +46,4 @@ func (b *SquaredBackoffPolling) Poll(context context.Context, RId string) (<-cha
 		}
 	}()
 	return channel, nil
-}
-
-func (b *SquaredBackoffPolling) TaskUpdate(info api.TaskInfo) error {
-	if info.Failed || info.Completed {
-		delete(b.backoffCounter, info.RId)
-		return b.PollLogger.TaskUpdate(info)
-	} else {
-		return b.PollLogger.TaskUpdate(info)
-	}
 }

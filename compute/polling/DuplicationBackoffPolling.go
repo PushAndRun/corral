@@ -18,23 +18,27 @@ func (b *DuplicationBackoffPolling) Poll(context context.Context, RId string) (<
 	predictionStartTime := time.Now().UnixNano()
 	var backoff int
 
-	if b.backoffCounter == nil {
-		b.backoffCounter = make(map[string]int)
-	}
-
+	b.PrematurePollMutex.Lock()
 	if polls, ok := b.NumberOfPrematurePolls[RId]; ok {
 		b.NumberOfPrematurePolls[RId] = polls + 1
 	} else {
 		b.NumberOfPrematurePolls[RId] = 1
+	}
+	b.PrematurePollMutex.Unlock()
+
+	b.BackoffCounterMutex.Lock()
+	if b.backoffCounter == nil {
+		b.backoffCounter = make(map[string]int)
 	}
 
 	if last, ok := b.backoffCounter[RId]; ok {
 		b.backoffCounter[RId] = last + last
 		backoff = last
 	} else {
-		backoff = 2
-		b.backoffCounter[RId] = backoff
+		backoff = 4
+		b.backoffCounter[RId] = backoff + backoff
 	}
+	b.BackoffCounterMutex.Unlock()
 
 	predictionEndTime := time.Now().UnixNano()
 	b.PollPredictionTimeMutex.Lock()
@@ -60,7 +64,9 @@ func (b *DuplicationBackoffPolling) Poll(context context.Context, RId string) (<
 
 func (b *DuplicationBackoffPolling) TaskUpdate(info api.TaskInfo) error {
 	if info.Failed || info.Completed {
+		b.BackoffCounterMutex.Lock()
 		delete(b.backoffCounter, info.RId)
+		b.BackoffCounterMutex.Unlock()
 		return b.PollLogger.TaskUpdate(info)
 	} else {
 		return b.PollLogger.TaskUpdate(info)
