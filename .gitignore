@@ -23,3 +23,4 @@ coverage.txt
 compute/polling/jobLog.csv
 .gitignore
 compute/polling/taskLog.csv
+libtensorflow-cpu-linux-x86_64-2.8.0.tar.gz

@@ -1,11 +1,16 @@
 from datetime import time
 
+import img as img
+import matplotlib
 import numpy as np
 import pandas as pd
 import os
 import seaborn as sns
 
 import sklearn
+from matplotlib import pyplot
+from pandas.plotting._matplotlib import scatter_matrix
+from sklearn.preprocessing import MinMaxScaler
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
@@ -16,6 +21,12 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from scikeras.wrappers import KerasRegressor
 from sklearn.model_selection import GridSearchCV
+import matplotlib.pyplot as plt
+
+matplotlib.interactive(True)
+pd.options.plotting.backend = 'matplotlib'
+
+
 
 job_column_names = ['job_id', 'tpch_query_id', 'polling_strategy', 'number_of_jobs', 'job_number_j',
                     'prev_job_bytes_written', 'splits', 'split_size', 'map_bin_size',
@@ -45,6 +56,8 @@ jobs = jobs.drop_duplicates(subset=None, keep='first', inplace=False)
 
 # remove failed tasks
 tasks = tasks.query('failed != "true"').copy()
+tasks = tasks.query('total_execution_time < 600000000000').copy()
+
 
 raw_dataset = pd.merge(jobs, tasks, how='inner', on='job_id', validate="one_to_many")
 
@@ -59,6 +72,7 @@ dataset = raw_dataset.copy()
 dataset = dataset.dropna()
 
 dataset['total_execution_time'] = round(dataset['total_execution_time'] / 1000000000, 0)
+
 
 # convert categorical variables
 dataset['map_complexity'] = dataset['map_complexity'].map({'1': 'MC_Eeasy', '2': 'MC_Medium', '3': 'MC_High'})
@@ -77,19 +91,41 @@ dataset = dataset.sample(frac=1)
 dataset = dataset.sample(frac=1)
 dataset = dataset.sample(frac=1)
 
-dataset.tail()
+print(dataset['total_execution_time'].describe())
 
-X = dataset.copy().drop(['total_execution_time'], axis=1)
-y = dataset['total_execution_time']
+print(dataset.describe().transpose())
 
-# Normalize and create normalize layer
-normalizer = tf.keras.layers.Normalization(axis=-1)
-normalizer.adapt(X)
+columns = list(dataset.columns)
 
-# split data
-X_train, X_test, y_train, y_test = sklearn.model_selection.train_test_split(X, y, test_size=0.2, random_state=123,
-                                                                            stratify=y)
-sns.pairplot(dataset)
+scaler = MinMaxScaler()
+# fit scaler on data
+scaler.fit(dataset)
+# apply transform
+dataset = scaler.transform(dataset)
 
-import matplotlib.pyplot as plt
+dataset = pd.DataFrame(dataset, columns=columns)
+
+dataset.hist(['total_execution_time'], bins=50)
+pyplot.title('Total Execution Time Histogram')
+pyplot.xlabel('Seconds')
+pyplot.ylabel('Count')
+#import seaborn as sns
+#sns.boxplot(x = data['Col1'], y = data['Col2'])
+
+#dataset.plot.box()
+#import seaborn as sns
+#sns.set(rc = {'figure.figsize':(15,15)})
+#sns.boxplot(data=dataset)
+
+#scatter_matrix(dataset, alpha=0.2, figsize=(15, 15), diagonal='hist')
 plt.show(block=True)
+
+
+
+
+#print(plt.get_backend())
+
+#X = dataset.copy().drop(['total_execution_time'], axis=1)
+#y = dataset['total_execution_time']
+
+

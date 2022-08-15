@@ -1,0 +1,2303 @@
+C:\Users\tgold\Documents\Studium\BA\Tensorflow\Prediction\venv\Scripts\python.exe "C:/Users/tgold/Documents/Studium/BA/Tensorflow/Neuer Ordner/Prediction/Benchmarks/benchmarkEval.py"
+------------------Overall--------------------
+Total execution time in ms:
+count     11792.000000
+mean      30687.929613
+std       44962.841445
+min          60.000000
+25%        8689.750000
+50%       18474.500000
+75%       40385.750000
+max      834461.000000
+Name: total_execution_time, dtype: float64
+Total execution time for Q15 in ms:
+count      4162.000000
+mean      32788.156415
+std       39436.720033
+min         340.000000
+25%        2555.500000
+50%        9261.500000
+75%       63103.250000
+max      304910.000000
+Name: total_execution_time, dtype: float64
+
+Total execution time for Q18 in ms:
+count      3549.000000
+mean      24848.797408
+std       17199.491350
+min          74.000000
+25%       11156.000000
+50%       18891.000000
+75%       37858.000000
+max      147947.000000
+Name: total_execution_time, dtype: float64
+
+Total execution time for Q21 in ms:
+count      4081.000000
+mean      33623.959079
+std       62899.356783
+min          60.000000
+25%       12951.000000
+50%       20806.000000
+75%       30185.000000
+max      834461.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count     11792.000000
+mean      14791.073185
+std       40912.807625
+min          18.000000
+25%         568.000000
+50%        5961.000000
+75%       13166.500000
+max      824435.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count     11792.000000
+mean      15896.739824
+std       19922.301528
+min          34.000000
+25%        3466.250000
+50%        6504.500000
+75%       20239.000000
+max      109017.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count    1.179200e+04
+mean     3.015412e+04
+std      7.347690e+04
+min      7.300000e+01
+25%      3.787000e+03
+50%      9.619500e+03
+75%      2.171550e+04
+max      2.067583e+06
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    11792.000000
+mean         2.093877
+std          1.322838
+min          1.000000
+25%          1.000000
+50%          2.000000
+75%          3.000000
+max         14.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    11792.000000
+mean         0.001696
+std          0.041150
+min          0.000000
+25%          0.000000
+50%          0.000000
+75%          0.000000
+max          1.000000
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    1.179200e+04
+mean     2.337750e+05
+std      2.422190e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      2.480400e+05
+75%      3.528040e+05
+max      3.325993e+06
+Name: job_execution_time, dtype: float64
+----------Constant Polling------------
+------------------All Queries--------------------
+Total execution time:
+count      1640.000000
+mean      24871.430488
+std       21847.995361
+min          74.000000
+25%       10882.500000
+50%       17205.000000
+75%       32628.250000
+max      135426.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count     1640.000000
+mean      8687.236585
+std       8828.307011
+min         19.000000
+25%        606.750000
+50%       6846.500000
+75%      12635.250000
+max      67292.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      1640.000000
+mean      16184.076829
+std       20603.168322
+min          46.000000
+25%        1026.500000
+50%        6554.500000
+75%       17367.250000
+max      109017.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count     1640.000000
+mean      6238.931707
+std       3141.063996
+min         73.000000
+25%       3475.500000
+50%       6903.500000
+75%       9281.250000
+max      10915.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    1640.000000
+mean        2.697561
+std         2.264670
+min         1.000000
+25%         1.000000
+50%         2.000000
+75%         3.000000
+max        14.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    1640.0
+mean        0.0
+std         0.0
+min         0.0
+25%         0.0
+50%         0.0
+75%         0.0
+max         0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count      1640.000000
+mean     150431.573171
+std      123696.619443
+min           0.000000
+25%           0.000000
+50%      230154.000000
+75%      238615.000000
+max      922384.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q15 (const.)--------------------
+Total execution time in ms:
+count       598.000000
+mean      26744.112040
+std       29787.285506
+min         724.000000
+25%        2211.250000
+50%       12720.500000
+75%       59985.750000
+max      135426.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      598.000000
+mean      7546.658863
+std       8976.273886
+min         20.000000
+25%        665.500000
+50%       4907.000000
+75%      11924.750000
+max      67292.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      598.000000
+mean     19197.314381
+std      28008.524411
+min        316.000000
+25%        620.000000
+50%        806.000000
+75%      55845.750000
+max      71758.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      598.000000
+mean      8127.013378
+std       2534.860095
+min        177.000000
+25%       8184.750000
+50%       9248.000000
+75%       9618.000000
+max      10576.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    598.000000
+mean       2.974916
+std        3.074351
+min        1.000000
+25%        1.000000
+50%        1.000000
+75%        6.000000
+max       14.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    598.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       598.000000
+mean     237938.204013
+std       34500.298183
+min           0.000000
+25%      237956.000000
+50%      240069.000000
+75%      250379.000000
+max      250379.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q18 (const.)--------------------
+Total execution time in ms:
+count      507.000000
+mean     26498.090730
+std      18810.399307
+min         74.000000
+25%      10844.500000
+50%      19134.000000
+75%      39864.500000
+max      84950.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      507.000000
+mean      5494.938856
+std       6334.599004
+min         19.000000
+25%        127.000000
+50%       2203.000000
+75%       9534.500000
+max      32272.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      507.000000
+mean     21003.069034
+std      17457.835963
+min         46.000000
+25%       6238.500000
+50%      11500.000000
+75%      35486.500000
+max      57998.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      507.000000
+mean      4967.915187
+std       2768.351780
+min        121.000000
+25%       2650.500000
+50%       4631.000000
+75%       7430.500000
+max      10573.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    507.000000
+mean       2.998028
+std        1.970633
+min        1.000000
+25%        1.000000
+50%        2.000000
+75%        4.000000
+max        9.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    507.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       507.000000
+mean     195252.355030
+std       81784.514152
+min           0.000000
+25%      218682.000000
+50%      230154.000000
+75%      238615.000000
+max      238615.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q21 (const.)--------------------
+Total execution time in ms:
+count       535.000000
+mean      21236.700935
+std       10870.283050
+min         112.000000
+25%       12178.500000
+50%       20385.000000
+75%       27585.500000
+max      126863.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      535.000000
+mean     12987.349533
+std       9025.347387
+min         23.000000
+25%       5451.000000
+50%      11725.000000
+75%      20507.500000
+max      57533.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count       535.000000
+mean       8249.226168
+std        6462.539975
+min          78.000000
+25%        5589.500000
+50%        6660.000000
+75%        9827.000000
+max      109017.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      535.000000
+mean      5333.011215
+std       3080.394324
+min         73.000000
+25%       2820.500000
+50%       4882.000000
+75%       8272.500000
+max      10915.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    535.000000
+mean       2.102804
+std        0.984283
+min        1.000000
+25%        2.000000
+50%        2.000000
+75%        3.000000
+max       13.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    535.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       535.000000
+mean      10145.401869
+std       95365.104852
+min           0.000000
+25%           0.000000
+50%           0.000000
+75%           0.000000
+max      922384.000000
+Name: job_execution_time, dtype: float64
+
+----------Exponential Backoff Polling------------
+------------------All Queries--------------------
+Total execution time:
+count      1750.000000
+mean      24069.422286
+std       22088.202908
+min         100.000000
+25%        8380.750000
+50%       15971.000000
+75%       30191.250000
+max      110456.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count     1750.000000
+mean      7921.300000
+std      10138.635807
+min         20.000000
+25%        480.000000
+50%       5886.000000
+75%      10926.750000
+max      93719.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count     1750.000000
+mean     16148.007429
+std      20623.289432
+min         68.000000
+25%       4077.250000
+50%       6515.500000
+75%      21887.250000
+max      82628.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      1750.000000
+mean      78257.645714
+std      103834.286288
+min         141.000000
+25%        3811.000000
+50%       11100.500000
+75%      206707.250000
+max      256410.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    1750.000000
+mean        2.088571
+std         0.739041
+min         1.000000
+25%         2.000000
+50%         2.000000
+75%         3.000000
+max         3.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    1750.0
+mean        0.0
+std         0.0
+min         0.0
+25%         0.0
+50%         0.0
+75%         0.0
+max         0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    1.750000e+03
+mean     4.336114e+05
+std      3.865593e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      6.502400e+05
+75%      6.662828e+05
+max      2.295716e+06
+Name: job_execution_time, dtype: float64
+
+------------------Q15 (Exp.)--------------------
+Total execution time in ms:
+count      598.000000
+mean     24314.377926
+std      28241.977930
+min        343.000000
+25%       2695.250000
+50%       9216.000000
+75%      59407.000000
+max      89995.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      598.000000
+mean      6151.807692
+std       8892.173576
+min         24.000000
+25%        777.500000
+50%       5001.500000
+75%       8414.000000
+max      65257.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      598.000000
+mean     18162.426421
+std      26529.779914
+min        299.000000
+25%        626.250000
+50%        943.500000
+75%      57208.250000
+max      64551.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count       598.000000
+mean      66920.396321
+std       95447.761260
+min         175.000000
+25%        2831.750000
+50%        3676.500000
+75%      203378.250000
+max      219980.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    598.000000
+mean       1.650502
+std        0.916949
+min        1.000000
+25%        1.000000
+50%        1.000000
+75%        3.000000
+max        3.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    598.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       598.000000
+mean     644419.806020
+std       92439.447819
+min           0.000000
+25%      650240.000000
+50%      661243.000000
+75%      661404.000000
+max      661404.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q18 (Exp.)--------------------
+Total execution time in ms:
+count      507.000000
+mean     20064.453649
+std      11515.965949
+min        124.000000
+25%      11027.000000
+50%      18095.000000
+75%      28157.000000
+max      69163.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      507.000000
+mean      5482.175542
+std       6907.340041
+min         22.000000
+25%        169.500000
+50%        844.000000
+75%       8027.500000
+max      31720.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      507.00000
+mean     14582.16568
+std       9953.04924
+min         73.00000
+25%       6187.00000
+50%       9597.00000
+75%      23058.00000
+max      42905.00000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count       507.000000
+mean     102951.086785
+std      115278.604929
+min         261.000000
+25%        8907.000000
+50%       14625.000000
+75%      244769.000000
+max      256150.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    507.000000
+mean       2.382643
+std        0.510303
+min        1.000000
+25%        2.000000
+50%        2.000000
+75%        3.000000
+max        3.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    507.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       507.000000
+mean     709458.461538
+std      314955.557398
+min           0.000000
+25%      667909.000000
+50%      904879.000000
+75%      925097.000000
+max      925097.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q21 (Exp.)--------------------
+Total execution time in ms:
+count       645.000000
+mean      26990.407752
+std       21452.274730
+min         100.000000
+25%       12395.000000
+50%       20933.000000
+75%       30269.000000
+max      110456.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      645.000000
+mean     11479.117829
+std      12170.039698
+min         20.000000
+25%       3824.000000
+50%       9265.000000
+75%      17912.000000
+max      93719.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      645.000000
+mean     15511.200000
+std      20462.111147
+min         68.000000
+25%       5531.000000
+50%       7205.000000
+75%      11747.000000
+max      82628.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count       645.000000
+mean      69358.576744
+std       98566.630435
+min         141.000000
+25%        7593.000000
+50%       11299.000000
+75%      195111.000000
+max      256410.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    645.000000
+mean       2.263566
+std        0.471541
+min        1.000000
+25%        2.000000
+50%        2.000000
+75%        3.000000
+max        3.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    645.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    6.450000e+02
+mean     2.133563e+04
+std      2.203522e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+max      2.295716e+06
+Name: job_execution_time, dtype: float64
+
+----------Squared Backoff Polling------------
+------------------All Queries--------------------
+Total execution time:
+count      1664.000000
+mean      29189.853966
+std       43502.716115
+min          82.000000
+25%        8334.500000
+50%       15687.500000
+75%       31086.500000
+max      304910.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      1664.000000
+mean      14178.067308
+std       33535.165190
+min          19.000000
+25%         609.750000
+50%        6186.500000
+75%       12154.250000
+max      275503.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count     1664.000000
+mean     15011.696514
+std      18268.863717
+min         45.000000
+25%       1734.000000
+50%       6550.500000
+75%      16593.000000
+max      96845.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count     1664.000000
+mean      8903.294471
+std       7718.734301
+min        153.000000
+25%       3200.000000
+50%       5905.000000
+75%      13107.250000
+max      44614.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    1664.000000
+mean        2.400841
+std         1.079977
+min         1.000000
+25%         2.000000
+50%         2.000000
+75%         3.000000
+max         6.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    1664.0
+mean        0.0
+std         0.0
+min         0.0
+25%         0.0
+50%         0.0
+75%         0.0
+max         0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    1.664000e+03
+mean     1.931010e+05
+std      1.911077e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      2.480400e+05
+75%      2.813560e+05
+max      2.264087e+06
+Name: job_execution_time, dtype: float64
+
+------------------Q15 (squared)--------------------
+Total execution time in ms:
+count       585.000000
+mean      32111.697436
+std       58262.808171
+min         340.000000
+25%        2922.000000
+50%        8288.000000
+75%       47060.000000
+max      304910.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count       585.000000
+mean      16251.926496
+std       43683.067713
+min          21.000000
+25%         655.000000
+50%        4967.000000
+75%        7934.000000
+max      241602.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      585.000000
+mean     15859.670085
+std      23927.939489
+min        312.000000
+25%        600.000000
+50%        901.000000
+75%      40819.000000
+max      67872.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      585.000000
+mean      6324.268376
+std       6757.383384
+min        153.000000
+25%       3037.000000
+50%       3524.000000
+75%       4867.000000
+max      31943.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    585.000000
+mean       1.905983
+std        1.349676
+min        1.000000
+25%        1.000000
+50%        1.000000
+75%        4.000000
+max        4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    585.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       585.000000
+mean     351501.282051
+std       92360.515076
+min           0.000000
+25%      281356.000000
+50%      334351.000000
+75%      467860.000000
+max      467860.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q18 (squared)--------------------
+Total execution time in ms:
+count       507.000000
+mean      25978.142012
+std       20849.758964
+min         100.000000
+25%       11942.500000
+50%       19435.000000
+75%       35973.000000
+max      147947.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count       507.000000
+mean       6564.536489
+std       13920.962538
+min          19.000000
+25%         161.000000
+50%        2290.000000
+75%        9260.500000
+max      121011.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      507.000000
+mean     19413.512821
+std      15812.589656
+min         73.000000
+25%       6371.500000
+50%      11660.000000
+75%      31916.500000
+max      57743.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      507.000000
+mean     11299.940828
+std       9088.168498
+min        158.000000
+25%       3933.000000
+50%       8365.000000
+75%      18040.500000
+max      33996.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    507.000000
+mean       2.800789
+std        0.860737
+min        1.000000
+25%        2.000000
+50%        3.000000
+75%        4.000000
+max        4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    507.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       507.000000
+mean     207802.792899
+std       86969.151274
+min           0.000000
+25%      232952.000000
+50%      248040.000000
+75%      250647.000000
+max      250647.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q21 (squared)--------------------
+Total execution time in ms:
+count       572.000000
+mean      29048.349650
+std       40456.778321
+min          82.000000
+25%       13011.250000
+50%       19665.500000
+75%       26378.250000
+max      293299.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count       572.000000
+mean      18805.431818
+std       32781.585019
+min          25.000000
+25%        5003.750000
+50%       11698.000000
+75%       18525.000000
+max      275503.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      572.000000
+mean     10242.840909
+std      11142.258093
+min         45.000000
+25%       5337.250000
+50%       6745.000000
+75%      10709.500000
+max      96845.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      572.000000
+mean      9416.634615
+std       6437.899073
+min        223.000000
+25%       3939.250000
+50%       7812.000000
+75%      14821.750000
+max      44614.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    572.000000
+mean       2.552448
+std        0.679222
+min        1.000000
+25%        2.000000
+50%        2.000000
+75%        3.000000
+max        6.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    572.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    5.720000e+02
+mean     1.806955e+04
+std      1.853475e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+max      2.264087e+06
+Name: job_execution_time, dtype: float64
+
+----------Linear Backoff Polling------------
+------------------All Queries--------------------
+Total execution time:
+count      1683.000000
+mean      25893.300059
+std       31548.436306
+min          71.000000
+25%        7271.500000
+50%       16255.000000
+75%       33844.000000
+max      404597.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      1683.000000
+mean      10835.494949
+std       24367.642187
+min          20.000000
+25%         473.000000
+50%        5798.000000
+75%       11811.000000
+max      364328.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count     1683.000000
+mean     15057.666072
+std      18507.246845
+min         45.000000
+25%       3396.500000
+50%       6166.000000
+75%      20404.500000
+max      85975.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count    1.683000e+03
+mean     1.439992e+04
+std      5.133429e+04
+min      8.300000e+01
+25%      3.593000e+03
+50%      1.149000e+04
+75%      1.786650e+04
+max      2.067583e+06
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    1683.000000
+mean        2.098633
+std         0.848033
+min         1.000000
+25%         2.000000
+50%         2.000000
+75%         3.000000
+max         4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    1683.000000
+mean        0.000594
+std         0.024376
+min         0.000000
+25%         0.000000
+50%         0.000000
+75%         0.000000
+max         1.000000
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    1.683000e+03
+mean     2.035398e+05
+std      1.995846e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      2.916280e+05
+75%      3.528040e+05
+max      3.325993e+06
+Name: job_execution_time, dtype: float64
+
+------------------Q15 (linear)--------------------
+Total execution time in ms:
+count      596.000000
+mean     22608.025168
+std      27536.267782
+min        409.000000
+25%       2304.750000
+50%       7036.500000
+75%      56833.000000
+max      92714.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      596.000000
+mean      5100.880872
+std       8083.587912
+min         24.000000
+25%        631.500000
+50%       4875.000000
+75%       6752.250000
+max      63916.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      596.000000
+mean     17507.008389
+std      25607.417635
+min        303.000000
+25%        634.000000
+50%        901.000000
+75%      55159.250000
+max      64275.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      596.000000
+mean     10318.377517
+std      14930.116573
+min        331.000000
+25%       3030.500000
+50%       3483.500000
+75%       4223.000000
+max      51960.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    596.000000
+mean       1.805369
+std        1.184935
+min        1.000000
+25%        1.000000
+50%        1.000000
+75%        3.000000
+max        4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    596.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       596.000000
+mean     345969.489933
+std       49635.269536
+min           0.000000
+25%      352804.000000
+50%      353130.000000
+75%      353306.000000
+max      353306.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q18 (linear)--------------------
+Total execution time in ms:
+count      507.000000
+mean     24406.577909
+std      15489.278024
+min         93.000000
+25%      11464.000000
+50%      18472.000000
+75%      38838.000000
+max      75636.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      507.000000
+mean      6151.617357
+std       8313.997596
+min         21.000000
+25%        125.500000
+50%        711.000000
+75%      10476.000000
+max      43333.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      507.000000
+mean     18254.836292
+std      14395.245474
+min         47.000000
+25%       5896.000000
+50%      11954.000000
+75%      30554.000000
+max      47525.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      507.000000
+mean     16477.631164
+std       7977.515634
+min         83.000000
+25%      11396.000000
+50%      16169.000000
+75%      19178.000000
+max      49671.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    507.000000
+mean       2.392505
+std        0.538794
+min        1.000000
+25%        2.000000
+50%        2.000000
+75%        3.000000
+max        4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    507.000000
+mean       0.001972
+std        0.044412
+min        0.000000
+25%        0.000000
+50%        0.000000
+75%        0.000000
+max        1.000000
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       507.000000
+mean     246510.958580
+std      102867.109809
+min           0.000000
+25%      284271.000000
+50%      291628.000000
+75%      292025.000000
+max      292025.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q21 (linear)--------------------
+Total execution time in ms:
+count       580.000000
+mean      30568.803448
+std       43215.210249
+min          71.000000
+25%       13092.250000
+50%       20741.500000
+75%       30887.750000
+max      404597.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count       580.000000
+mean      20822.660345
+std       38005.346793
+min          20.000000
+25%        5289.000000
+50%       11604.500000
+75%       24996.000000
+max      364328.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      580.000000
+mean      9745.987931
+std       9832.215242
+min         45.000000
+25%       5317.500000
+50%       6548.500000
+75%      10269.000000
+max      85975.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count    5.800000e+02
+mean     1.677785e+04
+std      8.569730e+04
+min      4.920000e+02
+25%      7.142750e+03
+50%      1.337150e+04
+75%      1.670400e+04
+max      2.067583e+06
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    580.000000
+mean       2.143103
+std        0.475882
+min        1.000000
+25%        2.000000
+50%        2.000000
+75%        2.000000
+max        4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    580.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    5.800000e+02
+mean     1.961824e+04
+std      2.180701e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+max      3.325993e+06
+Name: job_execution_time, dtype: float64
+
+----------Duplication Backoff Polling------------
+------------------All Queries--------------------
+Total execution time:
+count      1672.000000
+mean      23536.715311
+std       22438.886464
+min         110.000000
+25%        6879.750000
+50%       15883.000000
+75%       33344.250000
+max      132901.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count     1672.000000
+mean      8174.149522
+std      11492.378372
+min         20.000000
+25%        541.250000
+50%       5599.000000
+75%      11428.750000
+max      93568.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count     1672.000000
+mean     15362.450957
+std      19348.607685
+min         61.000000
+25%       3249.500000
+50%       6365.500000
+75%      17076.250000
+max      79228.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      1672.000000
+mean      12507.602871
+std       16001.041832
+min         102.000000
+25%        3310.750000
+50%        5866.000000
+75%       14935.500000
+max      126973.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    1672.000000
+mean        2.604665
+std         1.291153
+min         1.000000
+25%         2.000000
+50%         2.000000
+75%         4.000000
+max         6.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    1672.0
+mean        0.0
+std         0.0
+min         0.0
+25%         0.0
+50%         0.0
+75%         0.0
+max         0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count      1672.000000
+mean     175410.589115
+std      148779.732928
+min           0.000000
+25%           0.000000
+50%      248764.000000
+75%      310072.000000
+max      977656.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q15 (duplication)--------------------
+Total execution time in ms:
+count      595.000000
+mean     23482.756303
+std      29297.937853
+min        385.000000
+25%       2215.500000
+50%       6623.000000
+75%      58106.500000
+max      97094.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      595.000000
+mean      5098.401681
+std       8150.501764
+min         24.000000
+25%        670.000000
+50%       4673.000000
+75%       5905.500000
+max      67445.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      595.000000
+mean     18384.174790
+std      26898.452872
+min        324.000000
+25%        618.000000
+50%        865.000000
+75%      54183.000000
+max      68410.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      595.000000
+mean     14609.576471
+std      20845.099389
+min        219.000000
+25%       3235.000000
+50%       3639.000000
+75%       7601.500000
+max      64041.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    595.000000
+mean       2.174790
+std        1.716341
+min        1.000000
+25%        1.000000
+50%        1.000000
+75%        4.000000
+max        5.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    595.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       595.000000
+mean     308653.931092
+std       44455.728884
+min           0.000000
+25%      310072.000000
+50%      317475.000000
+75%      317537.000000
+max      317537.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q18 (duplication)--------------------
+Total execution time in ms:
+count      507.000000
+mean     24078.159763
+std      15453.763400
+min        110.000000
+25%      10508.500000
+50%      18556.000000
+75%      40195.000000
+max      79555.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      507.000000
+mean      5310.735700
+std       6373.244215
+min         20.000000
+25%        168.500000
+50%       1834.000000
+75%       9468.500000
+max      44856.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      507.000000
+mean     18767.309665
+std      14674.817907
+min         65.000000
+25%       6194.500000
+50%      10330.000000
+75%      32266.500000
+max      46812.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      507.000000
+mean     11745.867850
+std       9314.172415
+min        237.000000
+25%       4468.000000
+50%      10028.000000
+75%      16372.000000
+max      63347.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    507.000000
+mean       2.956607
+std        0.935726
+min        1.000000
+25%        2.000000
+50%        3.000000
+75%        4.000000
+max        5.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    507.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       507.000000
+mean     204957.727811
+std       86839.881186
+min           0.000000
+25%      217456.000000
+50%      248764.000000
+75%      255402.000000
+max      255402.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q21 (duplication)--------------------
+Total execution time in ms:
+count       570.000000
+mean      23111.440351
+std       19228.873401
+min         114.000000
+25%       11880.750000
+50%       19049.500000
+75%       26235.500000
+max      132901.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      570.000000
+mean     13931.729825
+std      15231.265113
+min         22.000000
+25%       5198.000000
+50%      10943.500000
+75%      17516.750000
+max      93568.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      570.000000
+mean      9179.663158
+std       9717.267680
+min         61.000000
+25%       5317.000000
+50%       6303.500000
+75%       9949.500000
+max      79228.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count       570.000000
+mean      10990.980702
+std       14618.544227
+min         102.000000
+25%        3313.250000
+50%        7001.500000
+75%       13046.500000
+max      126973.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    570.000000
+mean       2.740351
+std        0.848416
+min        1.000000
+25%        2.000000
+50%        3.000000
+75%        3.000000
+max        6.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    570.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       570.000000
+mean      10041.838596
+std       97460.624640
+min           0.000000
+25%           0.000000
+50%           0.000000
+75%           0.000000
+max      977656.000000
+Name: job_execution_time, dtype: float64
+
+----------Average Polling------------
+------------------All Queries--------------------
+Total execution time:
+count      3383.000000
+mean      43587.851611
+std       68168.572318
+min          60.000000
+25%       11852.500000
+50%       26898.000000
+75%       63503.000000
+max      834461.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      3383.000000
+mean      26843.444280
+std       67925.246377
+min          18.000000
+25%         650.000000
+50%        6532.000000
+75%       24236.000000
+max      824435.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count     3383.000000
+mean     16744.287319
+std      20903.915066
+min         34.000000
+25%       3527.500000
+50%       6741.000000
+75%      21360.500000
+max      88785.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count    3.383000e+03
+mean     4.387578e+04
+std      9.804604e+04
+min      1.970000e+02
+25%      1.053850e+04
+50%      2.434900e+04
+75%      4.727050e+04
+max      1.301606e+06
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    3383.000000
+mean        1.398167
+std         0.861261
+min         1.000000
+25%         1.000000
+50%         1.000000
+75%         1.000000
+max         4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    3383.000000
+mean        0.005616
+std         0.074742
+min         0.000000
+25%         0.000000
+50%         0.000000
+75%         0.000000
+max         1.000000
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    3.383000e+03
+mean     2.346980e+05
+std      2.101491e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      3.098070e+05
+75%      3.697810e+05
+max      2.343587e+06
+Name: job_execution_time, dtype: float64
+
+------------------Q15 (average)--------------------
+Total execution time in ms:
+count      1190.000000
+mean      50167.532773
+std       40852.116099
+min         361.000000
+25%        2557.000000
+50%       62656.500000
+75%       74818.250000
+max      221968.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      1190.000000
+mean      30612.204202
+std       39805.791828
+min          20.000000
+25%         782.250000
+50%        5279.000000
+75%       68024.250000
+max      178213.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count     1190.000000
+mean     19555.221008
+std      28334.793416
+min        311.000000
+25%        627.000000
+50%        997.000000
+75%      57167.000000
+max      71157.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count     1190.000000
+mean     35635.193277
+std      30300.905212
+min        200.000000
+25%       9150.500000
+50%      33010.000000
+75%      59753.250000
+max      98346.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    1190.000000
+mean        1.474790
+std         1.060311
+min         1.000000
+25%         1.000000
+50%         1.000000
+75%         1.000000
+max         4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    1190.000000
+mean        0.000840
+std         0.028989
+min         0.000000
+25%         0.000000
+50%         0.000000
+75%         0.000000
+max         1.000000
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count      1190.000000
+mean     423758.769748
+std       80475.186915
+min           0.000000
+25%      369781.000000
+50%      424805.000000
+75%      479911.000000
+max      509514.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q18 (average)--------------------
+Total execution time in ms:
+count     1014.000000
+mean     26458.078895
+std      17899.930481
+min         74.000000
+25%      11482.500000
+50%      19692.000000
+75%      41402.500000
+max      86187.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count     1014.000000
+mean      6919.451677
+std      10436.800151
+min         19.000000
+25%        151.250000
+50%       1911.500000
+75%       9855.500000
+max      49748.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count     1014.000000
+mean     19538.504931
+std      16222.543063
+min         47.000000
+25%       6002.000000
+50%      10324.000000
+75%      33620.250000
+max      58386.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count     1014.000000
+mean     18985.569034
+std      12154.986607
+min        215.000000
+25%       9326.750000
+50%      17424.500000
+75%      28703.750000
+max      61548.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    1014.000000
+mean        1.534517
+std         0.823095
+min         1.000000
+25%         1.000000
+50%         1.000000
+75%         2.000000
+max         4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    1014.000000
+mean        0.003945
+std         0.062714
+min         0.000000
+25%         0.000000
+50%         0.000000
+75%         0.000000
+max         1.000000
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count      1014.000000
+mean     268577.325444
+std      112521.563676
+min           0.000000
+25%      297529.000000
+50%      309807.000000
+75%      326105.000000
+max      331309.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q21 (average)--------------------
+Total execution time in ms:
+count      1179.000000
+mean      51679.258694
+std      104973.377071
+min          60.000000
+25%       14178.500000
+50%       22646.000000
+75%       57819.500000
+max      834461.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      1179.000000
+mean      40175.169635
+std      104972.769283
+min          18.000000
+25%        4600.500000
+50%       12113.000000
+75%       30331.500000
+max      824435.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count     1179.000000
+mean     11503.958439
+std      13254.576577
+min         34.000000
+25%       5414.000000
+50%       7944.000000
+75%      10823.500000
+max      88785.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count    1.179000e+03
+mean     7.360011e+04
+std      1.582996e+05
+min      1.970000e+02
+25%      1.365650e+04
+50%      3.277700e+04
+75%      5.680050e+04
+max      1.301606e+06
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    1179.000000
+mean        1.203562
+std         0.593646
+min         1.000000
+25%         1.000000
+50%         1.000000
+75%         1.000000
+max         4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    1179.000000
+mean        0.011874
+std         0.108367
+min         0.000000
+25%         0.000000
+50%         0.000000
+75%         0.000000
+max         1.000000
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    1.179000e+03
+mean     1.473523e+04
+std      1.544162e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+max      2.343587e+06
+Name: job_execution_time, dtype: float64
+
+----------Moving Average Polling------------
+------------------All Queries--------------------
+Total execution time:
+count      1701.000000
+mean      35708.274544
+std       28889.890086
+min          61.000000
+25%       11816.000000
+50%       26299.000000
+75%       61430.000000
+max      163325.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      1701.000000
+mean      18820.715461
+std       26916.296725
+min          18.000000
+25%         564.000000
+50%        6668.000000
+75%       19866.000000
+max      146579.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count     1701.000000
+mean     16887.445620
+std      21101.536127
+min         40.000000
+25%       3929.000000
+50%       6804.000000
+75%      21364.000000
+max      76566.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count    1.701000e+03
+mean     2.662712e+04
+std      4.943317e+04
+min      2.480000e+02
+25%      7.845000e+03
+50%      1.603000e+04
+75%      3.399700e+04
+max      1.301606e+06
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    1701.000000
+mean        1.420341
+std         0.881995
+min         1.000000
+25%         1.000000
+50%         1.000000
+75%         1.000000
+max         4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    1701.000000
+mean        0.003527
+std         0.059304
+min         0.000000
+25%         0.000000
+50%         0.000000
+75%         0.000000
+max         1.000000
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    1.701000e+03
+mean     2.209177e+05
+std      2.017661e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      3.044230e+05
+75%      3.640340e+05
+max      2.343587e+06
+Name: job_execution_time, dtype: float64
+
+------------------Q15 (moving average)--------------------
+Total execution time in ms:
+count       594.000000
+mean      44658.589226
+std       34171.446754
+min         407.000000
+25%        2394.750000
+50%       59156.000000
+75%       68509.500000
+max      163325.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count       594.000000
+mean      25400.653199
+std       33312.524931
+min          20.000000
+25%         760.250000
+50%        5371.500000
+75%       37181.000000
+max      146579.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      594.000000
+mean     19257.824916
+std      27877.479522
+min        324.000000
+25%        614.750000
+50%       1011.500000
+75%      56898.000000
+max      71157.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      594.000000
+mean     27321.393939
+std      29182.483736
+min        248.000000
+25%       3718.000000
+50%      14557.000000
+75%      34419.250000
+max      94924.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    594.000000
+mean       1.491582
+std        1.096105
+min        1.000000
+25%        1.000000
+50%        1.000000
+75%        1.000000
+max        4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    594.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       594.000000
+mean     396801.927609
+std       77814.536974
+min           0.000000
+25%      364034.000000
+50%      369781.000000
+75%      479911.000000
+max      479911.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q18 (moving average)--------------------
+Total execution time in ms:
+count      507.000000
+mean     26078.122288
+std      17484.531226
+min         85.000000
+25%      11890.000000
+50%      19698.000000
+75%      39500.000000
+max      76428.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      507.000000
+mean      6652.126233
+std       9212.682433
+min         19.000000
+25%        151.000000
+50%        638.000000
+75%      10400.500000
+max      44294.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      507.000000
+mean     19425.881657
+std      16233.333203
+min         52.000000
+25%       6082.500000
+50%       9826.000000
+75%      31696.000000
+max      54806.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count      507.000000
+mean     16026.084813
+std      10481.728012
+min        323.000000
+25%       8353.500000
+50%      14519.000000
+75%      23387.500000
+max      61548.000000
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    507.000000
+mean       1.516765
+std        0.815618
+min        1.000000
+25%        1.000000
+50%        1.000000
+75%        2.000000
+max        4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    507.0
+mean       0.0
+std        0.0
+min        0.0
+25%        0.0
+50%        0.0
+75%        0.0
+max        0.0
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count       507.000000
+mean     258961.136095
+std      108106.797702
+min           0.000000
+25%      297529.000000
+50%      304423.000000
+75%      309807.000000
+max      309807.000000
+Name: job_execution_time, dtype: float64
+
+------------------Q21 (moving average)--------------------
+Total execution time in ms:
+count       600.000000
+mean      34984.941667
+std       28213.915825
+min          61.000000
+25%       13917.500000
+50%       22069.500000
+75%       58943.250000
+max      129201.000000
+Name: total_execution_time, dtype: float64
+
+Latency between the task was polled by the backend and the function was started in ms:
+count      600.000000
+mean     22589.035000
+std      26520.660414
+min         18.000000
+25%       4556.750000
+50%      11464.500000
+75%      25963.250000
+max      88970.000000
+Name: function_start_latency, dtype: float64
+
+Duration of the function execution in ms:
+count      600.000000
+mean     12395.791667
+std      15508.297629
+min         40.000000
+25%       5421.500000
+50%       7749.500000
+75%      10641.250000
+max      76566.000000
+Name: function_execution_duration, dtype: float64
+
+Latency between function completion and final poll in ms:
+count    6.000000e+02
+mean     3.489767e+04
+std      7.638841e+04
+min      5.000000e+02
+25%      9.768250e+03
+50%      2.749650e+04
+75%      5.131250e+04
+max      1.301606e+06
+Name: poll_latency, dtype: float64
+
+Number of premature polls:
+count    600.000000
+mean       1.268333
+std        0.648355
+min        1.000000
+25%        1.000000
+50%        1.000000
+75%        1.000000
+max        4.000000
+Name: number_of_premature_polls, dtype: float64
+
+Required time to calculate the poll times in ms:
+count    600.000000
+mean       0.010000
+std        0.099582
+min        0.000000
+25%        0.000000
+50%        0.000000
+75%        0.000000
+max        1.000000
+Name: poll_calculation_time, dtype: float64
+
+Overall job duration in ms:
+count    6.000000e+02
+mean     1.464552e+04
+std      1.585812e+05
+min      0.000000e+00
+25%      0.000000e+00
+50%      0.000000e+00
+75%      0.000000e+00
+max      2.343587e+06
+Name: job_execution_time, dtype: float64
+
+
+Process finished with exit code 0

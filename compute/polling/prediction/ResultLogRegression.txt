@@ -1,0 +1,43 @@
+Best: -18.440631 using {'batch_size': 10, 'epochs': 10, 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.001}
+-18.759563 (0.154740) with: {'batch_size': 10, 'epochs': 10, 'optimizer': 'Adam', 'optimizer__learning_rate': 0.001}
+-26.161701 (0.270579) with: {'batch_size': 10, 'epochs': 10, 'optimizer': 'Adagrad', 'optimizer__learning_rate': 0.001}
+-18.440631 (0.264313) with: {'batch_size': 10, 'epochs': 10, 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.001}
+-26.215515 (0.294339) with: {'batch_size': 10, 'epochs': 10, 'optimizer': 'Adagrad', 'optimizer__learning_rate': 0.001}
+-26.403242 (0.246709) with: {'batch_size': 10, 'epochs': 10, 'optimizer': 'Adadelta', 'optimizer__learning_rate': 0.001}
+-18.882280 (0.023124) with: {'batch_size': 10, 'epochs': 10, 'optimizer': 'Adam', 'optimizer__learning_rate': 0.001}
+-20.442840 (0.300897) with: {'batch_size': 10, 'epochs': 10, 'optimizer': 'Adamax', 'optimizer__learning_rate': 0.001}
+-18.785230 (0.099236) with: {'batch_size': 10, 'epochs': 10, 'optimizer': 'Nadam', 'optimizer__learning_rate': 0.001}
+736/736 [==============================] - 0s 608us/step
+Tested metrics of best model: 0.092339
+
+Best: -18.299307 using {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.001}
+-18.299307 (0.243640) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.001}
+-18.964598 (0.214142) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'linear', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.001}
+-25.382483 (0.228347) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'sigmoid', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.001}
+736/736 [==============================] - 1s 675us/step
+Tested metrics of best model: 0.091846
+
+Best: -17.274693 using {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.1}
+-18.166875 (0.125570) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.001}
+-17.415072 (0.094402) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.01}
+-17.274693 (0.144516) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.1}
+736/736 [==============================] - 1s 645us/step
+Tested metrics of best model: 0.281134
+
+Best: -17.263276 using {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.1}
+-17.263276 (0.211892) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.1}
+-17.303827 (0.217576) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.2}
+-17.382703 (0.177920) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.3}
+736/736 [==============================] - 1s 672us/step
+Tested metrics of best model: 0.291679
+
+Best: -17.261394 using {'batch_size': 10, 'epochs': 100, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.1}
+-17.290387 (0.079539) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.1}
+-17.261394 (0.075278) with: {'batch_size': 10, 'epochs': 100, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.1}
+-17.269982 (0.116736) with: {'batch_size': 10, 'epochs': 200, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.1}
+736/736 [==============================] - 0s 632us/step
+
+Without complexity classes
+Best: -17.273509 using {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.1}
+-17.273509 (0.114438) with: {'batch_size': 10, 'epochs': 10, 'model__activation1': 'relu', 'optimizer': 'RMSprop', 'optimizer__learning_rate': 0.1}
+736/736 [==============================] - 1s 661us/step
