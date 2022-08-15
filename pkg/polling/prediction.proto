@@ -1,0 +1,16 @@
+syntax = "proto3";
+package polling;
+
+option go_package = "https://github.com/PushAndRun/corral/compute/polling";
+
+service PollingDNN {
+  rpc predict (Features) returns (Label) {}
+}
+
+message Features {
+  repeated uint64 Instances = 11;
+}
+
+message Label {
+  repeated double Prediction = 1;
+}
