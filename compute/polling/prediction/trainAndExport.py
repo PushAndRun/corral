@@ -19,9 +19,7 @@ from scikeras.wrappers import KerasRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import MinMaxScaler
 from keras import backend as K
-
-sess = tf.compat.v1.Session()
-K.set_session(sess)
+from pathlib import Path
 
 job_column_names = ['job_id', 'tpch_query_id', 'polling_strategy', 'number_of_jobs', 'job_number_j',
                     'prev_job_bytes_written', 'splits', 'split_size', 'map_bin_size',
@@ -94,7 +92,7 @@ print(X.tail())
 print(y.tail())
 
 # Normalize and create normalize layer
-normalizerX = tf.keras.layers.Normalization(axis=-1, name="inputLayer")
+normalizerX = tf.keras.layers.Normalization(axis=-1, name="inputlayer")
 normalizerX.adapt(X)
 
 # split data
@@ -145,10 +143,22 @@ pyplot.plot(history.history['val_loss'], label='test')
 pyplot.legend()
 pyplot.show()
 
-print([n.name for n in dnn_model.as_graph_def().node])
+# Fetch the Keras session and save the model
+# The signature definition is defined by the input and output tensors,
+# and stored with the default serving key
+import tempfile
 
-# save the model
-builder = tf.saved_model.builder.SavedModelBuilder("Test")
-builder.add_meta_graph_and_variables(sess, ["DNNv1"])
-builder.save()
-sess.close()
+version = 1
+export_path = "pollingDNNv"+str(version)
+print('export_path = {}\n'.format(export_path))
+
+tf.keras.models.save_model(
+    dnn_model,
+    export_path,
+    overwrite=True,
+    include_optimizer=True,
+    save_format=None,
+    signatures=None,
+    options=None
+)
+
