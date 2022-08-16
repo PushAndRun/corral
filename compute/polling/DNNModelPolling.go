@@ -108,6 +108,9 @@ func (b *DNNModelPolling) Poll(context context.Context, RId string) (<-chan inte
 		} else {
 			backoff = prediction + timebuffer
 		}
+		if backoff <= 0 {
+			backoff = 10
+		}
 
 		b.PolledTasks[RId] = true
 		b.PolledTaskMutex.Unlock()
