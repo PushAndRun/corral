@@ -2,14 +2,10 @@ package polling
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"time"
 
-	"github.com/ISE-SMILE/corral/pkg/polling"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type DNNModelPolling struct {
@@ -17,9 +13,21 @@ type DNNModelPolling struct {
 
 	PolledTasks    map[string]bool
 	backoffCounter map[string]int
+
+	features map[string]JobFeatures
+
+	PredictionRequest
 }
 
-var serverAddr = flag.String("addr", "localhost:8500", "The server address in the format of host:port")
+type JobFeatures struct {
+	number_of_jobs         float64
+	prev_job_bytes_written float64
+	splits                 float64
+	split_size             float64
+	map_bin_size           float64
+	reduce_bin_size        float64
+	max_concurrency        float64
+}
 
 func (b *DNNModelPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
 	predictionStartTime := time.Now().UnixNano()
@@ -42,21 +50,9 @@ func (b *DNNModelPolling) Poll(context context.Context, RId string) (<-chan inte
 
 	if present, ok := b.PolledTasks[RId]; ok && present {
 		b.PolledTaskMutex.Unlock()
-		//we dont want to use the model again... fall back to dup.-backoff
-		b.BackoffCounterMutex.Lock()
-		if b.backoffCounter == nil {
-			b.backoffCounter = make(map[string]int)
-		}
-
-		if last, ok := b.backoffCounter[RId]; ok {
-			b.backoffCounter[RId] = last + last
-			backoff = last
-		} else {
-			backoff = 16
-			b.backoffCounter[RId] = backoff + backoff
-		}
-		b.BackoffCounterMutex.Unlock()
-		log.Println("Use the fallback")
+		//we dont want to use the model again... fall back to constant polling
+		backoff = 10
+		log.Debugf("Poll fallback backoff %s for %d seconds", RId, backoff)
 
 	} else {
 
@@ -66,11 +62,56 @@ func (b *DNNModelPolling) Poll(context context.Context, RId string) (<-chan inte
 		for _, val := range b.ExecutionTimes {
 			sum += val
 		}
-		data := []uint64{5.0, 3109232.0, 2.0, 134217728.0, 134217728.0, 134217728.0, 32.0, 1.0, 134217728.0, 1.0, 0.0}
-		backoff = b.GetPrediction(data) + timebuffer
+
+		b.IdMapMutex.Lock()
+		jobId := b.rIdToJobId[RId]
+		taskId := b.rIdToTaskId[RId]
+		b.IdMapMutex.Unlock()
+
+		var number_of_inputs, bin_size, Map, Reduce float64
+
+		b.TaskMapMutex.Lock()
+		number_of_inputs = float64(b.taskInfos[taskId].NumberOfInputs)
+		bin_size = float64(b.taskInfos[taskId].BinSize)
+		if b.taskInfos[taskId].Phase == 0 {
+			Map = 1
+			Reduce = 0
+		} else {
+			Map = 0
+			Reduce = 1
+		}
+		b.TaskMapMutex.Unlock()
+
+		b.JobMapMutex.Lock()
+		if b.features == nil {
+			b.features = make(map[string]JobFeatures)
+		}
+		if _, ok := b.features[RId]; !ok {
+			var entry JobFeatures
+			entry.number_of_jobs = float64(b.jobInfos[jobId].NumberOfJobs)
+			entry.prev_job_bytes_written = float64(b.jobInfos[jobId].PrevJobBytesWritten)
+			entry.splits = float64(b.jobInfos[jobId].Splits)
+			entry.split_size = float64(b.jobInfos[jobId].SplitSize)
+			entry.map_bin_size = float64(b.jobInfos[jobId].MapBinSize)
+			entry.reduce_bin_size = float64(b.jobInfos[jobId].ReduceBinSize)
+			entry.max_concurrency = float64(b.jobInfos[jobId].MaxConcurrency)
+			b.features[RId] = entry
+		}
+		f := b.features[RId]
+		b.JobMapMutex.Unlock()
+
+		log.Debug(fmt.Sprint(f.number_of_jobs, f.prev_job_bytes_written, f.splits, f.split_size, f.map_bin_size, f.reduce_bin_size, f.max_concurrency, number_of_inputs, bin_size, Map, Reduce))
+		data := []float64{f.number_of_jobs, f.prev_job_bytes_written, f.splits, f.split_size, f.map_bin_size, f.reduce_bin_size, f.max_concurrency, number_of_inputs, bin_size, Map, Reduce}
+		prediction, err := b.GetPrediction("pollingDNN", data)
+		if err != nil {
+			backoff = 16
+		} else {
+			backoff = prediction + timebuffer
+		}
 
 		b.PolledTasks[RId] = true
 		b.PolledTaskMutex.Unlock()
+		log.Debugf("Poll predicted backoff %s for %d seconds", RId, backoff)
 	}
 
 	predictionEndTime := time.Now().UnixNano()
@@ -81,7 +122,6 @@ func (b *DNNModelPolling) Poll(context context.Context, RId string) (<-chan inte
 		b.PollPredictionTimes[RId] = (predictionEndTime - predictionStartTime)
 	}
 	b.PollPredictionTimeMutex.Unlock()
-	log.Debugf("Poll (average) backoff %s for %d seconds", RId, backoff)
 
 	channel := make(chan interface{})
 	go func() {
@@ -93,20 +133,4 @@ func (b *DNNModelPolling) Poll(context context.Context, RId string) (<-chan inte
 		}
 	}()
 	return channel, nil
-}
-
-func (b *DNNModelPolling) GetPrediction(feat []uint64) int {
-
-	conn, err := grpc.Dial(*serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("fail to dial: %v", err)
-	}
-	defer conn.Close()
-	client := polling.NewPollingDNNClient(conn)
-	label, err := client.Predict(context.Background(), &polling.Features{Instances: feat})
-	if err != nil {
-		log.Fatalf("Unable to get the label: %v", err)
-	}
-	fmt.Sprintln("Received prediction: ", label.Prediction[0])
-	return int(label.Prediction[0])
 }
