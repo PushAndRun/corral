@@ -116,13 +116,12 @@ def create_model(activation='relu', nodes1=128, nodes2=256, nodes3=256,
                  init_mode='lecun_uniform'):  # optimizer='adam' layers=2,
     model = tf.keras.Sequential([
         normalizerX,
-        keras.layers.Dense(nodes1, activation=activation, kernel_initializer=init_mode),  # input_dim=9
-        keras.layers.Dense(nodes2, activation=activation, kernel_initializer=init_mode),
-        keras.layers.Dense(nodes3, activation=activation, kernel_initializer=init_mode)])
+        keras.layers.Dense(nodes1, activation='relu', kernel_initializer=init_mode),  # input_dim=9
+        keras.layers.Dense(nodes2, activation='linear', kernel_initializer=init_mode),
+        keras.layers.Dense(nodes3, activation='relu', kernel_initializer=init_mode),
+        keras.layers.Dense(1, activation='relu', name="inferenceLayer")])
 
-    model.add(tf.keras.layers.Dense(1, name="inferenceLayer"))
-
-    model.compile(loss="mean_squared_logarithmic_error", metrics=["mean_absolute_error", 'mean_squared_error'])
+    model.compile(loss="mean_squared_logarithmic_error", optimizer='Adam', metrics=["mean_absolute_error", 'mean_squared_error'])
 
     return model
 
