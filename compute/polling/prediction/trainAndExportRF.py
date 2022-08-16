@@ -1,25 +1,10 @@
-from datetime import time
+import tensorflow_decision_forests as tfdf
 
+import os
 import numpy as np
 import pandas as pd
-import os
-
-import sklearn
-import keras
-from matplotlib import pyplot
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
-np.set_printoptions(precision=3, suppress=True)
-
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
-from scikeras.wrappers import KerasRegressor
-from sklearn.model_selection import GridSearchCV
-from sklearn.preprocessing import MinMaxScaler
-from keras import backend as K
-from pathlib import Path
+import math
 
 job_column_names = ['job_id', 'tpch_query_id', 'polling_strategy', 'number_of_jobs', 'job_number_j',
                     'prev_job_bytes_written', 'splits', 'split_size', 'map_bin_size',
@@ -59,7 +44,7 @@ raw_dataset = raw_dataset.drop(
      'function_start_latency',
      'function_execution_duration', 'poll_latency', 'number_of_premature_polls', 'function_execution_start',
      'function_execution_end', 'final_poll_time', 'completed', 'failed', 'tpch_query_id', 'polling_strategy', 'backend',
-     'cache_type', 'job_execution_time', 'experiment_note', 'map_complexity', 'reduce_complexity'], axis=1)
+     'cache_type', 'job_execution_time', 'experiment_note'], axis=1)
 
 dataset = raw_dataset.copy()
 dataset = dataset.dropna()
@@ -67,85 +52,77 @@ dataset = dataset.dropna()
 dataset['total_execution_time'] = round(dataset['total_execution_time'] / 1000000000, 0)
 
 # convert categorical variables
-# dataset['map_complexity'] = dataset['map_complexity'].map({1: 'MC_Eeasy', 2: 'MC_Medium', 3: 'MC_High'})
-# dataset['reduce_complexity'] = dataset['reduce_complexity'].map({1: 'RC_Eeasy', 2: 'RC_Medium', 3: 'RC_High'})
-dataset['phase'] = dataset['phase'].map({0: 'Map', 1: 'Reduce'})
+dataset['map_complexity'] = dataset['map_complexity'].map({'1': 'MC_Eeasy', '2': 'MC_Medium', '3': 'MC_High'})
+dataset['reduce_complexity'] = dataset['reduce_complexity'].map({'1': 'RC_Eeasy', '2': 'RC_Medium', '3': 'RC_High'})
+dataset['phase'] = dataset['phase'].map({'0': 'Map', '1': 'Reduce'})
 
-# dataset = pd.get_dummies(dataset, columns=['map_complexity'], dtype=int, prefix='', prefix_sep='')
-# dataset = pd.get_dummies(dataset, columns=['reduce_complexity'], dtype=int, prefix='', prefix_sep='')
+dataset = pd.get_dummies(dataset, columns=['map_complexity'], dtype=int, prefix='', prefix_sep='')
+dataset = pd.get_dummies(dataset, columns=['reduce_complexity'], dtype=int, prefix='', prefix_sep='')
 dataset = pd.get_dummies(dataset, columns=['phase'], dtype=int, prefix='', prefix_sep='')
 
 # drop na values
 dataset = dataset.dropna()
 
-# shuffle
-dataset = dataset.sample(frac=1)
-dataset = dataset.sample(frac=1)
-dataset = dataset.sample(frac=1)
-
-print(dataset.columns)
-
-X = dataset.copy().drop(['total_execution_time'], axis=1)
-y = dataset['total_execution_time']
-
-print(X.tail())
-print(y.tail())
-
-# Normalize and create normalize layer
-normalizerX = tf.keras.layers.Normalization(axis=-1, name="inputlayer")
-normalizerX.adapt(X)
-
-# split data
-X_train, X_test, y_train, y_test = sklearn.model_selection.train_test_split(X, y, test_size=0.2, random_state=123,
-                                                                            stratify=y)
-
-from datetime import datetime
-
-now = datetime.now()
-
-current_time = now.strftime("%H:%M:%S")
-print("Current Time =", current_time)
+def split_dataset(dataset, test_ratio=0.30):
+  """Splits a panda dataframe in two."""
+  test_indices = np.random.rand(len(dataset)) < test_ratio
+  return dataset[~test_indices], dataset[test_indices]
 
 
-# fix random seed for reproducibility
-# seed = 7
-# tf.random.set_seed(seed)
+train_ds_pd, test_ds_pd = split_dataset(dataset)
+print("{} examples in training, {} examples for testing.".format(
+    len(train_ds_pd), len(test_ds_pd)))
 
-# Build model
-def create_model(activation='relu', nodes1=128, nodes2=256, nodes3=256,
-                 init_mode='lecun_uniform'):  # optimizer='adam' layers=2,
-    model = tf.keras.Sequential([
-        normalizerX,
-        keras.layers.Dense(nodes1, activation='relu', kernel_initializer=init_mode),  # input_dim=9
-        keras.layers.Dense(nodes2, activation='linear', kernel_initializer=init_mode),
-        keras.layers.Dense(nodes3, activation='relu', kernel_initializer=init_mode),
-        keras.layers.Dense(1, activation='relu', name="inferenceLayer")])
+label='total_execution_time'
 
-    model.compile(loss="mean_squared_logarithmic_error", metrics=["mean_absolute_error", 'mean_squared_error'])
-
-    return model
+train_ds = tfdf.keras.pd_dataframe_to_tf_dataset(train_ds_pd, label=label, task=tfdf.keras.Task.REGRESSION)
+test_ds = tfdf.keras.pd_dataframe_to_tf_dataset(test_ds_pd, label=label, task=tfdf.keras.Task.REGRESSION)
 
 
-dnn_model = create_model()
+# Configure the model.
+model_7 = tfdf.keras.RandomForestModel(task = tfdf.keras.Task.REGRESSION, max_depth=30)
 
-history = dnn_model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=30, verbose=1)
 
-now = datetime.now()
 
-current_time = now.strftime("%H:%M:%S")
-print("Current Time =", current_time)
+# Train the model.
+model_7.fit(x=train_ds)
 
-# plot loss during training
-pyplot.title('Loss / Mean Squared Logarithmic Error')
-pyplot.plot(history.history['loss'], label='train')
-pyplot.plot(history.history['val_loss'], label='test')
-pyplot.legend()
-pyplot.show()
 
-# Fetch the Keras session and save the model
-# The signature definition is defined by the input and output tensors,
-# and stored with the default serving key
-import tempfile
+# Evaluate the model on the test dataset.
+model_7.compile(metrics=["mse"])
+evaluation = model_7.evaluate(test_ds, return_dict=True)
+
+print(evaluation)
+print()
+print(f"MSE: {evaluation['mse']}")
+print(f"RMSE: {math.sqrt(evaluation['mse'])}")
+
+print(model_7.summary())
+# The input features
+print(model_7.make_inspector().features())
+
+# The feature importances
+print(model_7.make_inspector().variable_importances())
+print(model_7.make_inspector().evaluation())
+
+import matplotlib.pyplot as plt
+
+logs = model_7.make_inspector().training_logs()
+
+plt.figure(figsize=(12, 4))
+
+
+plt.subplot(1, 2, 1)
+plt.plot([log.num_trees for log in logs], [log.evaluation.accuracy for log in logs])
+plt.xlabel("Number of trees")
+plt.ylabel("Accuracy (out-of-bag)")
+
+plt.subplot(1, 2, 2)
+plt.plot([log.num_trees for log in logs], [log.evaluation.loss for log in logs])
+plt.xlabel("Number of trees")
+plt.ylabel("Logloss (out-of-bag)")
+
+plt.show()
 
 version = 1
 MODEL_DIR = "pollingDNN"
@@ -153,7 +130,7 @@ export_path = os.path.join(MODEL_DIR, str(version))
 print('export_path = {}\n'.format(export_path))
 
 tf.keras.models.save_model(
-    dnn_model,
+    model_7,
     export_path,
     overwrite=True,
     include_optimizer=True,

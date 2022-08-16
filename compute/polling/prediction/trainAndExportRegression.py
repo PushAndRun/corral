@@ -123,9 +123,9 @@ def create_model(activation1='relu', nodes1=128, nodes2=256, nodes3=256,
     return model
 
 
-dnn_model = create_model()
+reg_model = create_model()
 
-history = dnn_model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=30, verbose=1)
+history = reg_model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=30, verbose=1)
 
 now = datetime.now()
 
@@ -150,7 +150,7 @@ export_path = os.path.join(MODEL_DIR, str(version))
 print('export_path = {}\n'.format(export_path))
 
 tf.keras.models.save_model(
-    dnn_model,
+    reg_model,
     export_path,
     overwrite=True,
     include_optimizer=True,
