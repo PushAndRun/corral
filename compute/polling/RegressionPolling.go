@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type DNNModelPolling struct {
+type RegressionPolling struct {
 	PollLogger
 
 	PolledTasks    map[string]bool
@@ -19,17 +19,7 @@ type DNNModelPolling struct {
 	PredictionRequest
 }
 
-type JobFeatures struct {
-	number_of_jobs         float64
-	prev_job_bytes_written float64
-	splits                 float64
-	split_size             float64
-	map_bin_size           float64
-	reduce_bin_size        float64
-	max_concurrency        float64
-}
-
-func (b *DNNModelPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
+func (b *RegressionPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
 	predictionStartTime := time.Now().UnixNano()
 
 	var backoff int

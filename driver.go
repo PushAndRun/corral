@@ -296,6 +296,20 @@ func WithDNNPolling() Option {
 	}
 }
 
+func WithRandomForestPolling() Option {
+	return func(c *config) {
+		c.Polling = &polling.RandomForestPolling{}
+		c.PollingLabel = "RandomForestPolling"
+	}
+}
+
+func WithRegressionPolling() Option {
+	return func(c *config) {
+		c.Polling = &polling.RegressionPolling{}
+		c.PollingLabel = "RegressionPolling"
+	}
+}
+
 func SetExperimentNote(note string) Option {
 	return func(c *config) {
 		viper.Set("experimentNote", note)
