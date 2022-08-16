@@ -129,7 +129,7 @@ def create_model(activation='relu', nodes1=128, nodes2=256, nodes3=256,
 
 dnn_model = create_model()
 
-history = dnn_model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=1, verbose=1)
+history = dnn_model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=30, verbose=1)
 
 now = datetime.now()
 
@@ -149,7 +149,8 @@ pyplot.show()
 import tempfile
 
 version = 1
-export_path = "pollingDNNv"+str(version)
+MODEL_DIR = "pollingDNN"
+export_path = os.path.join(MODEL_DIR, str(version))
 print('export_path = {}\n'.format(export_path))
 
 tf.keras.models.save_model(
