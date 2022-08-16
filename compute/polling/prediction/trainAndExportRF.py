@@ -125,7 +125,7 @@ plt.ylabel("Logloss (out-of-bag)")
 plt.show()
 
 version = 1
-MODEL_DIR = "pollingDNN"
+MODEL_DIR = "pollingRF"
 export_path = os.path.join(MODEL_DIR, str(version))
 print('export_path = {}\n'.format(export_path))
 
