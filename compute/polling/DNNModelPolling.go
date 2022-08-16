@@ -3,14 +3,13 @@ package polling
 import (
 	"context"
 	"flag"
+	"fmt"
 	"time"
 
+	"github.com/ISE-SMILE/corral/pkg/polling"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-)
-
-const (
-	address = "localhost:5000v1/models/pollingDNN:predict"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type DNNModelPolling struct {
@@ -20,12 +19,7 @@ type DNNModelPolling struct {
 	backoffCounter map[string]int
 }
 
-var (
-	tls                = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
-	caFile             = flag.String("ca_file", "", "The file containing the CA root cert file")
-	serverAddr         = flag.String("addr", "localhost:8500", "The server address in the format of host:port")
-	serverHostOverride = flag.String("server_host_override", "x.test.example.com", "The server name used to verify the hostname returned by the TLS handshake")
-)
+var serverAddr = flag.String("addr", "localhost:8500", "The server address in the format of host:port")
 
 func (b *DNNModelPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
 	predictionStartTime := time.Now().UnixNano()
@@ -66,14 +60,15 @@ func (b *DNNModelPolling) Poll(context context.Context, RId string) (<-chan inte
 
 	} else {
 
-		//get the average
+		//get the prediction
 
 		var sum int
 		for _, val := range b.ExecutionTimes {
 			sum += val
 		}
-		backoff = int(sum/len(b.ExecutionTimes)) + timebuffer
-		log.Println("Use the average")
+		data := []uint64{5.0, 3109232.0, 2.0, 134217728.0, 134217728.0, 134217728.0, 32.0, 1.0, 134217728.0, 1.0, 0.0}
+		backoff = b.GetPrediction(data) + timebuffer
+
 		b.PolledTasks[RId] = true
 		b.PolledTaskMutex.Unlock()
 	}
@@ -100,11 +95,18 @@ func (b *DNNModelPolling) Poll(context context.Context, RId string) (<-chan inte
 	return channel, nil
 }
 
-func (b *DNNModelPolling) GetPrediction(Features []uint64) int {
-	conn, err := grpc.Dial(*serverAddr, opts...)
+func (b *DNNModelPolling) GetPrediction(feat []uint64) int {
+
+	conn, err := grpc.Dial(*serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("fail to dial: %v", err)
 	}
 	defer conn.Close()
-	client := pb.NewRouteGuideClient(conn)
+	client := polling.NewPollingDNNClient(conn)
+	label, err := client.Predict(context.Background(), &polling.Features{Instances: feat})
+	if err != nil {
+		log.Fatalf("Unable to get the label: %v", err)
+	}
+	fmt.Sprintln("Received prediction: ", label.Prediction[0])
+	return int(label.Prediction[0])
 }

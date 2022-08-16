@@ -8,9 +8,9 @@ service PollingDNN {
 }
 
 message Features {
-  repeated uint64 Instances = 11;
+  repeated float inputlayer_input = 11;
 }
 
 message Label {
-  repeated double Prediction = 1;
+  repeated float inferenceLayer = 1;
 }

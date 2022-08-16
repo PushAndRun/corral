@@ -289,6 +289,13 @@ func WithMovingAveragePolling() Option {
 	}
 }
 
+func WithDNNPolling() Option {
+	return func(c *config) {
+		c.Polling = &polling.DNNModelPolling{}
+		c.PollingLabel = "DNNModelPolling"
+	}
+}
+
 func SetExperimentNote(note string) Option {
 	return func(c *config) {
 		viper.Set("experimentNote", note)
