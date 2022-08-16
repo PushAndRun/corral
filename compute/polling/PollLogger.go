@@ -20,8 +20,10 @@ import (
 
 type PollLogger struct {
 	//Maps to hold the task and job infos for measuring the polling performance
-	taskInfos map[string]api.TaskInfo
-	jobInfos  map[string]api.JobInfo
+	taskInfos   map[string]api.TaskInfo
+	jobInfos    map[string]api.JobInfo
+	rIdToJobId  map[string]string
+	rIdToTaskId map[string]string
 
 	NumberOfPrematurePolls map[string]int
 	FinalPollTime          map[string]int64
@@ -30,11 +32,13 @@ type PollLogger struct {
 
 	PollingLabel            string
 	TaskMapMutex            sync.RWMutex
+	JobMapMutex             sync.RWMutex
 	PrematurePollMutex      sync.RWMutex
 	PollTimeMutex           sync.RWMutex
 	PolledTaskMutex         sync.RWMutex
-	PollPredictionTimeMutex sync.Mutex
-	BackoffCounterMutex     sync.Mutex
+	PollPredictionTimeMutex sync.RWMutex
+	BackoffCounterMutex     sync.RWMutex
+	IdMapMutex              sync.RWMutex
 }
 
 func (b *PollLogger) StartJob(info api.JobInfo) error {
@@ -49,8 +53,9 @@ func (b *PollLogger) StartJob(info api.JobInfo) error {
 	b.PollTimeMutex = sync.RWMutex{}
 	b.PrematurePollMutex = sync.RWMutex{}
 	b.PolledTaskMutex = sync.RWMutex{}
-	b.PollPredictionTimeMutex = sync.Mutex{}
-	b.BackoffCounterMutex = sync.Mutex{}
+	b.PollPredictionTimeMutex = sync.RWMutex{}
+	b.BackoffCounterMutex = sync.RWMutex{}
+	b.JobMapMutex = sync.RWMutex{}
 
 	if b.taskInfos == nil {
 		b.taskInfos = make(map[string]api.TaskInfo)
@@ -58,14 +63,23 @@ func (b *PollLogger) StartJob(info api.JobInfo) error {
 	if b.jobInfos == nil {
 		b.jobInfos = make(map[string]api.JobInfo)
 	}
+	if b.rIdToJobId == nil {
+		b.rIdToJobId = make(map[string]string)
+	}
+	if b.rIdToTaskId == nil {
+		b.rIdToTaskId = make(map[string]string)
+	}
 
+	b.JobMapMutex.Lock()
 	b.jobInfos[fmt.Sprint(info.JobId)] = info
+	b.JobMapMutex.Unlock()
 
 	return nil
 }
 
 func (b *PollLogger) JobUpdate(info api.JobInfo) error {
 
+	b.JobMapMutex.Lock()
 	if val, ok := b.jobInfos[fmt.Sprint(info.JobId)]; ok {
 		//update entry
 		mergo.MergeWithOverwrite(&val, info, mergo.WithTransformers(&timeTransformer{}))
@@ -74,11 +88,21 @@ func (b *PollLogger) JobUpdate(info api.JobInfo) error {
 		//create entry
 		b.jobInfos[fmt.Sprint(info.JobId)] = info
 	}
+	b.JobMapMutex.Unlock()
 	return nil
 }
 
 func (b *PollLogger) TaskUpdate(info api.TaskInfo) error {
 	log.Info("TaskUpdate called with: " + fmt.Sprint(info))
+
+	b.IdMapMutex.Lock()
+	if _, ok := b.rIdToJobId[info.RId]; !ok {
+		b.rIdToJobId[info.RId] = info.JobId
+	}
+	if _, ok := b.rIdToTaskId[info.RId]; !ok {
+		b.rIdToTaskId[info.RId] = info.TaskId
+	}
+	b.IdMapMutex.Unlock()
 
 	b.TaskMapMutex.Lock()
 	if val, ok := b.taskInfos[fmt.Sprint(info.TaskId)]; ok {
