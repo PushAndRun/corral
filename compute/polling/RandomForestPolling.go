@@ -86,7 +86,7 @@ func (b *RandomForestPolling) Poll(context context.Context, RId string) (<-chan 
 
 		log.Debug(fmt.Sprint(f.number_of_jobs, f.prev_job_bytes_written, f.splits, f.split_size, f.map_bin_size, f.reduce_bin_size, f.max_concurrency, number_of_inputs, bin_size, Map, Reduce))
 		data := []float64{f.number_of_jobs, f.prev_job_bytes_written, f.splits, f.split_size, f.map_bin_size, f.reduce_bin_size, f.max_concurrency, number_of_inputs, bin_size, Map, Reduce}
-		prediction, err := b.GetPrediction("pollingDNN", data)
+		prediction, err := b.GetPrediction("pollingRF", data)
 		if err != nil {
 			backoff = 16
 		} else {
