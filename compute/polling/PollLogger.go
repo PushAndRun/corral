@@ -165,8 +165,9 @@ func (b *PollLogger) TaskUpdate(info api.TaskInfo) error {
 		}
 
 		b.TaskMapMutex.Unlock()
-
+		b.PrematurePollMutex.Lock()
 		delete(b.NumberOfPrematurePolls, info.RId)
+		b.PrematurePollMutex.Unlock()
 		b.PollTimeMutex.Lock()
 		delete(b.FinalPollTime, info.RId)
 		b.PollTimeMutex.Unlock()
