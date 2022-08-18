@@ -14,8 +14,8 @@ type SquaredBackoffPolling struct {
 func (b *SquaredBackoffPolling) Poll(context context.Context, RId string) (<-chan interface{}, error) {
 	predictionStartTime := time.Now().UnixNano()
 	var backoff int
-	offset := 2
-	slope := 2
+	offset := 10
+	slope := 4
 
 	b.PrematurePollMutex.Lock()
 	if polls, ok := b.NumberOfPrematurePolls[RId]; ok {
