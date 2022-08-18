@@ -47,16 +47,76 @@ jobs = jobs.drop_duplicates(subset=None, keep='first', inplace=False)
 tasks = tasks.query('failed != "true"').copy()
 tasks = tasks.query('number_of_premature_polls >= 0').copy()
 
+jobs = jobs.query('experiment_note != "fitted"').copy()
 
 raw_dataset = pd.merge(jobs, tasks, how='inner', on='job_id', validate="one_to_many")
 
 raw_dataset = raw_dataset.drop(
-    ['r_id', 'job_id', 'task_id', 'function_memory', 'runtime_id', 'job_number_t', 'job_number_j', 'bin_id', 'function_execution_start',
+    ['r_id', 'task_id', 'function_memory', 'runtime_id', 'job_number_t', 'job_number_j', 'bin_id', 'function_execution_start',
      'function_execution_end', 'final_poll_time', 'completed', 'failed', 'backend',
      'cache_type', 'experiment_note'], axis=1)
 
 dataset = raw_dataset.copy()
 dataset = dataset.dropna()
+
+
+#Load fitted data separately
+job_column_names2 = ['job_id', 'tpch_query_id', 'polling_strategy', 'number_of_jobs', 'job_number_j',
+                    'prev_job_bytes_written', 'splits', 'split_size', 'map_bin_size',
+                    'reduce_bin_size', 'max_concurrency', 'backend', 'function_memory',
+                    'cache_type', 'map_complexity', 'reduce_complexity', 'job_execution_time',
+                    'experiment_note', 'map_bin_sizes', 'reduce_bin_sizes']
+
+task_column_names2 = ['r_id', 'job_id', 'task_id', 'runtime_id', 'phase',
+                     'job_number_t', 'number_of_inputs', 'bin_id', 'bin_size',
+                     'total_execution_time', 'function_start_latency', 'function_execution_duration', 'poll_latency', 'poll_calculation_time',
+                     'number_of_premature_polls', 'completed', 'failed', 'function_execution_start',
+                     'function_execution_end', 'final_poll_time']
+
+tasksFitted = pd.read_csv('./taskLog_benchmarks.csv',
+                    names=task_column_names2,
+                    na_values='?', comment='\t', quotechar='"', skiprows=1,
+                    sep=',', skipinitialspace=True, low_memory=False)
+
+jobsFitted = pd.read_csv('./jobLog_benchmarks.csv',
+                   names=job_column_names2,
+                   na_values='?', comment='\t', quotechar='"', skiprows=1,
+                   sep=',', skipinitialspace=True, low_memory=False)
+
+
+# remove duplicates and entries that were created by binsize maps
+jobsFitted = jobsFitted.drop(['map_bin_sizes', 'reduce_bin_sizes'], axis=1)
+jobsFitted = jobsFitted.drop_duplicates(subset=None, keep='first', inplace=False)
+
+# remove failed tasks
+tasksFitted = tasksFitted.query('failed != "true"').copy()
+tasksFitted = tasksFitted.query('number_of_premature_polls >= 0').copy()
+
+jobsFitted = jobsFitted.query('experiment_note == "fitted"').copy()
+
+raw_datasetFitted = pd.merge(jobsFitted, tasksFitted, how='inner', on='job_id', validate="one_to_many")
+
+raw_datasetFitted = raw_datasetFitted.drop(
+    ['r_id', 'task_id', 'function_memory', 'runtime_id', 'job_number_t', 'job_number_j', 'bin_id', 'function_execution_start',
+     'function_execution_end', 'final_poll_time', 'completed', 'failed', 'backend',
+     'cache_type', 'experiment_note'], axis=1)
+
+datasetFitted = raw_datasetFitted.copy()
+datasetFitted = datasetFitted.dropna()
+
+datasetFitted['total_execution_time'] = datasetFitted['total_execution_time'] / 1000000000
+datasetFitted['function_start_latency'] = datasetFitted['function_start_latency'] / 1000000000
+datasetFitted['function_execution_duration'] = datasetFitted['function_execution_duration'] / 1000000000
+datasetFitted['poll_calculation_time'] = datasetFitted['poll_calculation_time'] / 1000000
+datasetFitted['poll_latency'] = datasetFitted['poll_latency'] / 1000000000
+datasetFitted['job_execution_time'] = datasetFitted['job_execution_time'] / 1000000000
+
+datasetFitted['total_execution_time'] = round(datasetFitted['total_execution_time'], 2)
+datasetFitted['function_start_latency'] = round(datasetFitted['function_start_latency'], 2)
+datasetFitted['function_execution_duration'] = round(datasetFitted['function_execution_duration'], 2)
+datasetFitted['poll_calculation_time'] = round(datasetFitted['poll_calculation_time'], 2)
+datasetFitted['poll_latency'] = round(datasetFitted['poll_latency'], 2)
+datasetFitted['job_execution_time'] = round(datasetFitted['job_execution_time'], 2)
 
 dataset['total_execution_time'] = dataset['total_execution_time'] / 1000000000
 dataset['function_start_latency'] = dataset['function_start_latency'] / 1000000000
@@ -847,6 +907,7 @@ print(movingQ21['job_execution_time'].describe())
 print()
 
 DNN = dataset[dataset['polling_strategy'].str.contains("DNNModelPolling")]
+DNNFitted = datasetFitted[datasetFitted['polling_strategy'].str.contains("DNNModelPolling")]
 DNNQ15 = DNN.query('tpch_query_id == 15')
 DNNQ18 = DNN.query('tpch_query_id == 18')
 DNNQ21 = DNN.query('tpch_query_id == 21')
@@ -1059,6 +1120,7 @@ print(RFQ21['job_execution_time'].describe())
 print()
 
 Reg = dataset[dataset['polling_strategy'].str.contains("RegressionPolling")]
+RegFitted = datasetFitted[datasetFitted['polling_strategy'].str.contains("RegressionPolling")]
 RegQ15 = Reg.query('tpch_query_id == 15')
 RegQ18 = Reg.query('tpch_query_id == 18')
 RegQ21 = Reg.query('tpch_query_id == 21')
@@ -1164,6 +1226,10 @@ print("Overall job duration in ms:")
 print(RegQ21['job_execution_time'].describe())
 print()
 
+
+
+
+
 # initialize list elements
 sumData = [
 ['Constant Polling', const['number_of_premature_polls'].sum(), round(const['poll_latency'].sum())],
@@ -1173,9 +1239,11 @@ sumData = [
 ['Duplicate Backoff', duplicate['number_of_premature_polls'].sum(), round(duplicate['poll_latency'].sum())],
 ['Average (all)', average['number_of_premature_polls'].sum(), round(average['poll_latency'].sum())],
 ['Moving Average (5)', moving['number_of_premature_polls'].sum(), round(moving['poll_latency'].sum())],
-['Deep Neuronal Network Prediction', DNN['number_of_premature_polls'].sum(), round(DNN['poll_latency'].sum())],
+['DNN Prediction', DNN['number_of_premature_polls'].sum(), round(DNN['poll_latency'].sum())],
 #['Random Forest Prediction', RF['number_of_premature_polls'].sum(), round(RF['poll_latency'].sum())],
-#['Regression Model Prediction', Reg['number_of_premature_polls'].sum(), round(Reg['poll_latency'].sum())],
+['Regression Prediction', Reg['number_of_premature_polls'].sum(), round(Reg['poll_latency'].sum())],
+['DNN Prediction (fitted)', DNNFitted['number_of_premature_polls'].sum(), round(DNN['poll_latency'].sum())],
+['Regression Prediction (fitted)', RegFitted['number_of_premature_polls'].sum(), round(Reg['poll_latency'].sum())],
 ]
 
 sumPPData = [
@@ -1186,9 +1254,12 @@ sumPPData = [
 ['Duplicate Backoff', duplicate['number_of_premature_polls'].sum()],
 ['Average (all)', average['number_of_premature_polls'].sum()],
 ['Moving Average (5)', moving['number_of_premature_polls'].sum()],
-['Deep Neuronal Network Prediction', DNN['number_of_premature_polls'].sum()],
+['DNN Prediction', DNN['number_of_premature_polls'].sum()],
 #['Random Forest Prediction', RF['number_of_premature_polls'].sum()],
-#['Regression Model Prediction', Reg['number_of_premature_polls'].sum()],
+['Regression Prediction', Reg['number_of_premature_polls'].sum()],
+['DNN Prediction (fitted)', DNNFitted['number_of_premature_polls'].sum()],
+#['Random Forest Prediction', RF['number_of_premature_polls'].sum()],
+['Regression Prediction (fitted)', RegFitted['number_of_premature_polls'].sum()],
 ]
 
 sumLTData = [
@@ -1199,9 +1270,12 @@ sumLTData = [
 ['Duplicate Backoff', round(duplicate['poll_latency'].sum())],
 ['Average (all)', round(average['poll_latency'].sum())],
 ['Moving Average (5)', round(moving['poll_latency'].sum())],
-['Deep Neuronal Network Prediction', round(DNN['poll_latency'].sum())],
+['DNN Prediction', round(DNN['poll_latency'].sum())],
 #['Random Forest Prediction', round(RF['poll_latency'].sum())],
-#['Regression Model Prediction', round(Reg['poll_latency'].sum())],
+['Regression Prediction', round(Reg['poll_latency'].sum())],
+['DNN Prediction (fitted)', round(DNNFitted['poll_latency'].sum())],
+#['Random Forest Prediction', round(RF['poll_latency'].sum())],
+['Regression Prediction (fitted)', round(RegFitted['poll_latency'].sum())],
 ]
 
 meanData = [
@@ -1212,35 +1286,56 @@ meanData = [
 ['Duplicate Backoff', duplicate['number_of_premature_polls'].mean(), round(duplicate['poll_latency'].mean())],
 ['Average (all)', average['number_of_premature_polls'].mean(), round(average['poll_latency'].mean())],
 ['Moving Average (5)', moving['number_of_premature_polls'].mean(), round(moving['poll_latency'].mean())],
-['Deep Neuronal Network Prediction', DNN['number_of_premature_polls'].mean(), round(DNN['poll_latency'].mean())],
+['DNN Prediction', DNN['number_of_premature_polls'].mean(), round(DNN['poll_latency'].mean())],
 #['Random Forest Prediction', RF['number_of_premature_polls'].mean(), round(RF['poll_latency'].mean())],
-#['Regression Model Prediction', Reg['number_of_premature_polls'].mean(), round(Reg['poll_latency'].mean())],
+['Regression Prediction', Reg['number_of_premature_polls'].mean(), round(Reg['poll_latency'].mean())],
+['DNN Prediction (fitted)', DNNFitted['number_of_premature_polls'].mean(), round(DNN['poll_latency'].mean())],
+['Regression Prediction (fitted)', RegFitted['number_of_premature_polls'].mean(), round(Reg['poll_latency'].mean())],
 ]
 
+totalData = [
+['Constant Polling', const.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(const['job_execution_time'].mean())],
+['Exponential Backoff', exponential.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(exponential['job_execution_time'].mean())],
+['Squared Backoff', squared.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(squared['job_execution_time'].mean())],
+['Linear Backoff', linear.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(linear['job_execution_time'].mean())],
+['Duplicate Backoff', duplicate.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(duplicate['job_execution_time'].mean())],
+['Average (all)', average.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(average['job_execution_time'].mean())],
+['Moving Average (5)', moving.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(moving['job_execution_time'].mean())],
+['DNN Prediction', DNN.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(DNN['job_execution_time'].mean())],
+#['Random Forest Prediction', RF['number_of_premature_polls'].mean(), round(RF['poll_latency'].mean())],
+['Regression Prediction', Reg.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(Reg['job_execution_time'].mean())],
+['DNN Prediction (fitted)', DNNFitted.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(DNN['job_execution_time'].mean())],
+['Regression Prediction (fitted)', RegFitted.groupby(['job_id'], as_index=False).sum()['number_of_premature_polls'].mean(), round(Reg['job_execution_time'].mean())],
+    ]
+
 meanPPData = [
-['Constant Polling', const['number_of_premature_polls'].mean()],
-['Exponential Backoff', exponential['number_of_premature_polls'].mean()],
-['Squared Backoff', squared['number_of_premature_polls'].mean()],
-['Linear Backoff', linear['number_of_premature_polls'].mean()],
-['Duplicate Backoff', duplicate['number_of_premature_polls'].mean()],
-['Average (all)', average['number_of_premature_polls'].mean()],
-['Moving Average (5)', moving['number_of_premature_polls'].mean()],
-['Deep Neuronal Network Prediction', DNN['number_of_premature_polls'].mean()],
+['Constant Polling', const['number_of_premature_polls'].mean(), const['number_of_premature_polls'].std()],
+['Exponential Backoff', exponential['number_of_premature_polls'].mean(), exponential['number_of_premature_polls'].std()],
+['Squared Backoff', squared['number_of_premature_polls'].mean(), squared['number_of_premature_polls'].std()],
+['Linear Backoff', linear['number_of_premature_polls'].mean(), linear['number_of_premature_polls'].std()],
+['Duplicate Backoff', duplicate['number_of_premature_polls'].mean(), duplicate['number_of_premature_polls'].std()],
+['Average (all)', average['number_of_premature_polls'].mean(), average['number_of_premature_polls'].std()],
+['Moving Average (5)', moving['number_of_premature_polls'].mean(), moving['number_of_premature_polls'].std()],
+['DNN Prediction', DNN['number_of_premature_polls'].mean(), DNN['number_of_premature_polls'].std()],
 #['Random Forest Prediction', RF['number_of_premature_polls'].mean()],
-#['Regression Model Prediction', Reg['number_of_premature_polls'].mean()],
+['Regression Prediction', Reg['number_of_premature_polls'].mean(), Reg['number_of_premature_polls'].std()],
+['DNN Prediction (fitted)', DNNFitted['number_of_premature_polls'].mean(), DNNFitted['number_of_premature_polls'].std()],
+['Regression Prediction (fitted)', RegFitted['number_of_premature_polls'].mean(), RegFitted['number_of_premature_polls'].std()],
 ]
 
 meanLTData = [
-['Constant Polling', round(const['poll_latency'].mean())],
-['Exponential Backoff', round(exponential['poll_latency'].mean())],
-['Squared Backoff', round(squared['poll_latency'].mean())],
-['Linear Backoff', round(linear['poll_latency'].mean())],
-['Duplicate Backoff', round(duplicate['poll_latency'].mean())],
-['Average (all)', round(average['poll_latency'].mean())],
-['Moving Average (5)', round(moving['poll_latency'].mean())],
-['Deep Neuronal Network Prediction', round(DNN['poll_latency'].mean())],
+['Constant Polling', round(const['poll_latency'].mean()), const['poll_latency'].std()],
+['Exponential Backoff', round(exponential['poll_latency'].mean()), exponential['poll_latency'].std()],
+['Squared Backoff', round(squared['poll_latency'].mean()), squared['poll_latency'].std()],
+['Linear Backoff', round(linear['poll_latency'].mean()), linear['poll_latency'].std()],
+['Duplicate Backoff', round(duplicate['poll_latency'].mean()), duplicate['poll_latency'].std()],
+['Average (all)', round(average['poll_latency'].mean()), average['poll_latency'].std()],
+['Moving Average (5)', round(moving['poll_latency'].mean()), moving['poll_latency'].std()],
+['DNN Prediction', round(DNN['poll_latency'].mean()), DNN['poll_latency'].std()],
 #['Random Forest Prediction', round(RF['poll_latency'].mean())],
-#['Regression Model Prediction', round(Reg['poll_latency'].mean())],
+['Regression Prediction', round(Reg['poll_latency'].mean()), Reg['poll_latency'].std()],
+['DNN Prediction (fitted)', round(DNNFitted['poll_latency'].mean()), DNNFitted['poll_latency'].std()],
+['Regression Prediction (fitted)', round(RegFitted['poll_latency'].mean()), RegFitted['poll_latency'].std()],
 ]
 
 
@@ -1249,11 +1344,26 @@ sumPPDf = pd.DataFrame(sumPPData, columns=['Polling Strategy', 'Total Number Of 
 sumLTDf = pd.DataFrame(sumLTData, columns=['Polling Strategy', 'Total Poll Latency (s)'])
 
 meanDf = pd.DataFrame(meanData, columns=['Polling Strategy', 'Total Number Of Premature Polls', 'Total Poll Latency (s)'])
-meanPPDf = pd.DataFrame(meanPPData, columns=['Polling Strategy', 'Total Number Of Premature Polls'])
-meanLTDf = pd.DataFrame(meanLTData, columns=['Polling Strategy', 'Total Poll Latency (s)'])
+meanPPDf = pd.DataFrame(meanPPData, columns=['Polling Strategy', 'Total Number Of Premature Polls', 'std'])
+meanLTDf = pd.DataFrame(meanLTData, columns=['Polling Strategy', 'Total Poll Latency (s)', 'std'])
+
+totalDF = pd.DataFrame(totalData, columns=['Polling Strategy', 'Average job duration', 'Average polls per job'])
+print(totalDF['Average job duration'])
 
 #sumDf.plot(kind='barh', secondary_y='Total Poll Latency (s)', x='Polling Strategy')
 #plt.show(block=True)
+
+fig = plt.figure() # Create matplotlib figure
+ax = fig.add_subplot(111) # Create matplotlib axes
+ax2 = ax.twinx() # Create another axes that shares the same x-axis as ax.
+width = 0.2
+
+totalDF.plot(kind='bar', rot=30, label='Average job duration', legend=False, y='Average job duration', x='Polling Strategy', ylabel='Seconds', ax=ax, position=0, width=width, color='salmon',figsize=(20,10))
+totalDF.plot(kind='bar', rot=30, label='Average polls per job', legend=False, y='Average polls per job', x='Polling Strategy', ylabel='Polls', ax=ax2, position=1, width=width, color='royalblue', figsize=(20,10))
+fig.legend(loc=1)
+plt.title('Total latency and polls per strategy')
+plt.show(block=True)
+
 
 fig = plt.figure() # Create matplotlib figure
 ax = fig.add_subplot(111) # Create matplotlib axes
@@ -1275,6 +1385,16 @@ meanPPDf.plot(kind='bar', rot=30, legend=False, label='Average Premature Polls',
 meanLTDf.plot(kind='bar', rot=30, legend=False, label='Average Poll Latency', y='Total Poll Latency (s)', x='Polling Strategy', ylabel='Seconds', ax=ax2, position=0, width=width, color='lightseagreen', figsize=(20,10))
 fig.legend(loc=1)
 plt.title('Average latency and polls per strategy and task')
+plt.show(block=True)
+
+fig = plt.figure() # Create matplotlib figure
+ax = fig.add_subplot(111) # Create matplotlib axes
+ax2 = ax.twinx() # Create another axes that shares the same x-axis as ax.
+width = 0.2
+meanPPDf.plot(kind='bar', rot=30, legend=False, label='Std Average Premature Polls', y='std', x='Polling Strategy', ylabel='Polls', ax=ax, position=1, width=width, color='royalblue',figsize=(20,10))
+meanLTDf.plot(kind='bar', rot=30, legend=False, label='Std Average Poll Latency', y='std', x='Polling Strategy', ylabel='Seconds', ax=ax2, position=0, width=width, color='lightseagreen', figsize=(20,10))
+fig.legend(loc=1)
+plt.title('Standard deviation of premature polls and poll latency')
 plt.show(block=True)
 
 dataset = dataset.query('total_execution_time < 300')

@@ -29,16 +29,16 @@ job_column_names = ['job_id', 'tpch_query_id', 'polling_strategy', 'number_of_jo
 
 task_column_names = ['r_id', 'job_id', 'task_id', 'runtime_id', 'phase',
                      'job_number_t', 'number_of_inputs', 'bin_id', 'bin_size',
-                     'total_execution_time', 'function_start_latency', 'function_execution_duration', 'poll_latency',
+                     'total_execution_time', 'function_start_latency', 'function_execution_duration', 'poll_latency', 'poll_calculation_time',
                      'number_of_premature_polls', 'completed', 'failed', 'function_execution_start',
                      'function_execution_end', 'final_poll_time']
 
-tasks = pd.read_csv('./taskLog.csv',
+tasks = pd.read_csv('./taskLogFitted.csv',
                     names=task_column_names,
                     na_values='?', comment='\t', quotechar='"', skiprows=1,
                     sep=',', skipinitialspace=True, low_memory=False)
 
-jobs = pd.read_csv('./jobLog.csv',
+jobs = pd.read_csv('./jobLogFitted.csv',
                    names=job_column_names,
                    na_values='?', comment='\t', quotechar='"', skiprows=1,
                    sep=',', skipinitialspace=True, low_memory=False)
@@ -59,7 +59,7 @@ raw_dataset = raw_dataset.drop(
      'function_start_latency',
      'function_execution_duration', 'poll_latency', 'number_of_premature_polls', 'function_execution_start',
      'function_execution_end', 'final_poll_time', 'completed', 'failed', 'tpch_query_id', 'polling_strategy', 'backend',
-     'cache_type', 'job_execution_time', 'experiment_note', 'map_complexity', 'reduce_complexity'], axis=1)
+     'cache_type', 'job_execution_time', 'experiment_note', 'map_complexity', 'reduce_complexity', 'poll_calculation_time',], axis=1)
 
 dataset = raw_dataset.copy()
 dataset = dataset.dropna()
@@ -96,8 +96,8 @@ normalizerX = tf.keras.layers.Normalization(axis=-1, name="inputlayer")
 normalizerX.adapt(X)
 
 # split data
-X_train, X_test, y_train, y_test = sklearn.model_selection.train_test_split(X, y, test_size=0.2, random_state=123,
-                                                                            stratify=y)
+#X_train, X_test, y_train, y_test = sklearn.model_selection.train_test_split(X, y, test_size=0.2, random_state=123,
+                                                                            #stratify=y)
 
 from datetime import datetime
 
@@ -125,7 +125,7 @@ def create_model(activation1='relu', nodes1=128, nodes2=256, nodes3=256,
 
 reg_model = create_model()
 
-history = reg_model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=30, verbose=1)
+history = reg_model.fit(X, y, epochs=50, verbose=1)
 
 now = datetime.now()
 
@@ -133,18 +133,18 @@ current_time = now.strftime("%H:%M:%S")
 print("Current Time =", current_time)
 
 # plot loss during training
-pyplot.title('Loss / Mean Squared Logarithmic Error')
-pyplot.plot(history.history['loss'], label='train')
-pyplot.plot(history.history['val_loss'], label='test')
-pyplot.legend()
-pyplot.show()
+#pyplot.title('Loss / Mean Squared Logarithmic Error')
+#pyplot.plot(history.history['loss'], label='train')
+#pyplot.plot(history.history['val_loss'], label='test')
+#pyplot.legend()
+#pyplot.show()
 
 # Fetch the Keras session and save the model
 # The signature definition is defined by the input and output tensors,
 # and stored with the default serving key
 import tempfile
 
-version = 1
+version = 2
 MODEL_DIR = "pollingRegression"
 export_path = os.path.join(MODEL_DIR, str(version))
 print('export_path = {}\n'.format(export_path))
