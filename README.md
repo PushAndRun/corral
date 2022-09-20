@@ -2,7 +2,7 @@
 
 > Serverless MapReduce
 
-> This fork added an OpenWhisk backend and the ability to use Minio.io instad of S3. Also this repo uses go modules for easier compileing ;)
+> This fork adds an advanced several polling algorithms to Corral++ to improve the job orchestration process. An advanced logging allows to measure the efficiency and overhead of the polling algorithms.
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/ISE-SMILE/corral)](https://goreportcard.com/report/github.com/ISE-SMILE/corral)
 [![GoDoc](https://godoc.org/github.com/ISE-SMILE/corral?status.svg)](https://godoc.org/github.com/ISE-SMILE/corral)
